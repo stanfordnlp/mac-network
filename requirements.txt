@@ -1,0 +1,12 @@
+torch
+numpy
+Pillow
+scipy
+torchvision
+h5py
+tensorflow>=1.3
+tqdm
+termcolor
+matplotlib
+seaborn
+pandas

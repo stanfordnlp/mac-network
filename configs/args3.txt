@@ -1,0 +1,25 @@
+--netLength=8
+--parallel
+--evalTrain
+--retainVal
+--useEMA
+--lrReduce
+--adam
+--clip
+--memoryVariationalDropout
+--relu=ELU
+--encBi
+--wrdEmbRandom
+--wrdEmbUniform
+--outQuestion
+--initCtrl=Q
+--controlContextual
+--controlInputUnshared
+--readProjInputs
+--readMemConcatKB
+--readMemConcatProj
+--readMemProj
+--readCtrl
+--writeMemProj
+--writeSelfAtt
+--writeSelfAttMod CONT
