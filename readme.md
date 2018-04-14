@@ -56,7 +56,8 @@ Then, the program trains the model. Weights are saved by default to `./weights/{
 - You can use the `-r` flag to restore and continue training a previously pre-trained model. 
 - We recommend you to try out varying the number of MAC cells used in the network through the `--netLength` option to explore different lengths of reasoning processes!
 - Good lengths for CLEVR are in the range of 4-16 (using more cells tends to converge faster and achieve a bit higher accuracy, while lower number of cells usually result in more easily interpretable attention maps). 
-- We have explored several variants of our model. We provide a few examples in `configs/args1-4.txt`. For instance, you can run the first by: 
+
+We have explored several variants of our model. We provide a few examples in `configs/args1-4.txt`. For instance, you can run the first by: 
 ```bash
 python main.py --expName "experiment1" --train --testedNum 10000 --epochs 25 @configs/args1.txt
 ```
