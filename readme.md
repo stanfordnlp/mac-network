@@ -14,7 +14,7 @@ In particular, the implementation includes the MAC cell at [`mac_cell.py`](mac_c
 </div>
 
 ## Requirements
-- Tensorflow (originally has been developed in 1.3 but should work for later versions as well).
+- Tensorflow (originally has been developed with 1.3 but should work for later versions as well).
 - We have performed experiments on Maxwell Titan X GPU. We assume 12GB of GPU memory.
 - See [`requirements.txt`](requirements.txt) for the required python packages and run `pip install -r requirements.txt` to install them.
 
