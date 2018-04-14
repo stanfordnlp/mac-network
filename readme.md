@@ -85,4 +85,4 @@ python visualization.py --expName "clevrExperiment" --tier val
 }
 ```
 
-Thank you for your interest in our model! Please contact me at dorarad@stanford.edu for any questions, comments, or suggestions! :-)
+Thank you for your interest in our model! Please contact me at dorarad@cs.stanford.edu for any questions, comments, or suggestions! :-)
