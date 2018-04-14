@@ -56,7 +56,7 @@ outImgAttName = lambda instance, j: "./preds/{expName}/{tier}{id}Img_{step}.png"
     expName = args.expName, 
     tier = args.tier, 
     id = instance["index"], 
-    step = j)
+    step = j + 1)
 
 outTableAttName = lambda instance, name: "./preds/{expName}/{tier}{id}{tableName}_{right}{orientation}.png".format(
     expName = args.expName, 
