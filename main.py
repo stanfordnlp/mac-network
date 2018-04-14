@@ -1,4 +1,7 @@
 from __future__ import division
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", message="size changed")
 import sys 
 import os
 import time
@@ -18,8 +21,6 @@ from termcolor import colored, cprint
 from config import config, loadDatasetConfig, parseArgs
 from preprocess import Preprocesser, bold, bcolored, writeline, writelist
 from model import MACnet
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"]="3"
 
 ############################################# loggers #############################################
 
@@ -488,11 +489,11 @@ def statsToStr(stats, res, epoch, batchNum, dataLen, startTime):
                              "emL = {emaLoss:2.4f}, emA = {emaAcc:2.4f}; " + \
                              "{expname} {machine}/{gpu}"
 
-    s_epoch = bcolored("{:2d}".format(epoch),"yellow")
+    s_epoch = bcolored("{:2d}".format(epoch),"green")
     s_batchNum = "{:3d}".format(batchNum)
-    s_dataProcessed = bcolored("{:5d}".format(stats["totalData"]),"yellow")
+    s_dataProcessed = bcolored("{:5d}".format(stats["totalData"]),"green")
     s_dataLen = dataLen
-    s_time = bcolored("{:2.2f}".format(time.time() - startTime),"yellow")
+    s_time = bcolored("{:2.2f}".format(time.time() - startTime),"green")
     s_loadTime = res["readTime"] 
     s_trainTime = res["trainTime"]
     s_lr = bold(config.lr)
@@ -504,8 +505,8 @@ def statsToStr(stats, res, epoch, batchNum, dataLen, startTime):
     s_emaLoss = stats["emaLoss"]
     s_emaAcc = stats["emaAcc"]
     s_expname = config.expName 
-    s_machine = bcolored(config.dataPath[9:11],"yellow") 
-    s_gpu = bcolored(config.gpus,"yellow")
+    s_machine = bcolored(config.dataPath[9:11],"green") 
+    s_gpu = bcolored(config.gpus,"green")
 
     return formatStr.format(epoch = s_epoch, batchNum = s_batchNum, dataProcessed = s_dataProcessed,
                             dataLen = s_dataLen, time = s_time, loadTime = s_loadTime,
@@ -695,7 +696,7 @@ def main():
 
             # epoch in [restored + 1, epochs]
             for epoch in range(config.restoreEpoch + 1, config.epochs + 1):
-                print(bcolored("Training epoch {}...".format(epoch), "yellow"))
+                print(bcolored("Training epoch {}...".format(epoch), "green"))
                 start = time.time()
                 
                 # train
@@ -755,7 +756,7 @@ def main():
                 if config.lrReduce:
                     if not improveEnough(curr, prior, config.lr):
                         config.lr *= config.lrDecayRate
-                        print(colored("Reducing LR to %d" % config.lr, "red"))   
+                        print(colored("Reducing LR to {}".format(config.lr), "red"))   
 
                 # early stopping
                 if config.earlyStopping > 0:
