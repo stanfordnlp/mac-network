@@ -487,7 +487,7 @@ def statsToStr(stats, res, epoch, batchNum, dataLen, startTime):
                              "lr {lr}, l = {loss}, a = {acc}, avL = {avgLoss}, " + \
                              "avA = {avgAcc}, g = {gradNorm:2.4f}, " + \
                              "emL = {emaLoss:2.4f}, emA = {emaAcc:2.4f}; " + \
-                             "{expname} {machine}/{gpu}"
+                             "{expname}" # {machine}/{gpu}"
 
     s_epoch = bcolored("{:2d}".format(epoch),"green")
     s_batchNum = "{:3d}".format(batchNum)
@@ -505,15 +505,15 @@ def statsToStr(stats, res, epoch, batchNum, dataLen, startTime):
     s_emaLoss = stats["emaLoss"]
     s_emaAcc = stats["emaAcc"]
     s_expname = config.expName 
-    s_machine = bcolored(config.dataPath[9:11],"green") 
-    s_gpu = bcolored(config.gpus,"green")
+    # s_machine = bcolored(config.dataPath[9:11],"green") 
+    # s_gpu = bcolored(config.gpus,"green")
 
     return formatStr.format(epoch = s_epoch, batchNum = s_batchNum, dataProcessed = s_dataProcessed,
                             dataLen = s_dataLen, time = s_time, loadTime = s_loadTime,
                             trainTime = s_trainTime, lr = s_lr, loss = s_loss, acc = s_acc,
                             avgLoss = s_avgLoss, avgAcc = s_avgAcc, gradNorm = s_gradNorm,
-                            emaLoss = s_emaLoss, emaAcc = s_emaAcc, expname = s_expname,
-                            machine = s_machine, gpu = s_gpu)
+                            emaLoss = s_emaLoss, emaAcc = s_emaAcc, expname = s_expname)
+                            # machine = s_machine, gpu = s_gpu)
 
 # collectRuntimeStats, writer = None,  
 '''
@@ -618,6 +618,8 @@ def runEpoch(sess, model, data, train, epoch, saver = None, calle = None,
     
     sys.stdout.write("\r")
     sys.stdout.flush()
+
+    print("")
 
     closeImageFiles(data["images"])
 
