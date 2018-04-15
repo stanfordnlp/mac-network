@@ -60,7 +60,7 @@ Then, the program trains the model. Weights are saved by default to `./weights/{
 ### Model variants
 We have explored several variants of our model. We provide a few examples in `configs/args1-4.txt`. For instance, you can run the first by: 
 ```bash
-python main.py --expName "experiment1" --train --testedNum 10000 --epochs 25 --netLength 12 @configs/args1.txt
+python main.py --expName "experiment1" --train --testedNum 10000 --epochs 25 --netLength 8 @configs/args1.txt
 ```
 - [`args1`](config/args1.txt) is the standard recurrent-control-memory cell. Leads to the most interpretable results compared to others.
 - [`args2`](config/args2.txt) uses a variant of the control unit that tends to converge fast and yield high accuracy.
