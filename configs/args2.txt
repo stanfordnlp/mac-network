@@ -1,4 +1,3 @@
---netLength=12
 --parallel
 --evalTrain
 --retainVal
