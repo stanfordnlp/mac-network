@@ -57,14 +57,15 @@ Then, the program trains the model. Weights are saved by default to `./weights/{
 - We recommend you to try out varying the number of MAC cells used in the network through the `--netLength` option to explore different lengths of reasoning processes!
 - Good lengths for CLEVR are in the range of 4-16 (using more cells tends to converge faster and achieve a bit higher accuracy, while lower number of cells usually result in more easily interpretable attention maps). 
 
+### Model variants
 We have explored several variants of our model. We provide a few examples in `configs/args1-4.txt`. For instance, you can run the first by: 
 ```bash
 python main.py --expName "experiment1" --train --testedNum 10000 --epochs 25 --netLength 12 @configs/args1.txt
 ```
-- config/args1 is the standard recurrent-control-memory cell. Leads to the most interpretable results compared to others.
-- config/args2 uses a variant of the control unit that tends to converge fast and yield high accuracy.
-- config/args3 incorporates self-attention into the memory unit.
-- config/args4 adds memory control-based gating.
+- [`args1`](config/args1.txt) is the standard recurrent-control-memory cell. Leads to the most interpretable results compared to others.
+- [`args2`](config/args2.txt) uses a variant of the control unit that tends to converge fast and yield high accuracy.
+- [`args3`](config/args3.txt) incorporates self-attention into the memory unit.
+- [`args4`](config/args4.txt) adds memory control-based gating.
 
 See [`config.py`](config.py) for further available options (Note that some of them are still in an experimental stage).
 
