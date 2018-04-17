@@ -85,7 +85,7 @@ python visualization.py --expName "clevrExperiment" --tier val
 ```
 (Tier can be set to `train` or `test` as well). The script supports filtering of the visualized questions by various ways. See [`visualization.py`](visualization.py) for further details.
 
-Optionally, to make the image attention maps a little bit nicer, you can do the following (using [imagemagick](https://www.imagemagick.org)):
+Optionally, to make the image attention maps look a little bit nicer, you can do the following (using [imagemagick](https://www.imagemagick.org)):
 ```
 for x in preds/clevrExperiment/*Img*.png; do magick convert $x -brightness-contrast 20x35 $x; done;
 ```
