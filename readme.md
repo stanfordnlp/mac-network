@@ -85,6 +85,8 @@ python visualization.py --expName "clevrExperiment" --tier val
 ```
 (Tier can be set to `train` or `test` as well). The script supports filtering of the visualized questions by various ways. See [`visualization.py`](visualization.py) for further details.
 
+To get more interpretable visualizations, it is highly recommended to reduce the number of cells to 4-8 (`--netLength`). Using more cells allows the network to learn more effective ways to approach the task but these tend to be less interpretable compared to a shorter networks (with less cells).  
+
 Optionally, to make the image attention maps look a little bit nicer, you can do the following (using [imagemagick](https://www.imagemagick.org)):
 ```
 for x in preds/clevrExperiment/*Img*.png; do magick convert $x -brightness-contrast 20x35 $x; done;
