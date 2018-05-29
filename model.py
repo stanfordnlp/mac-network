@@ -332,7 +332,7 @@ class MACnet(object):
             #     interactions = projImages * projMemory
             # else:
             #     interactions = tf.tanh(projImages + projMemory) 
-            interactions = ops.mul(images, memory, inDim, proj = {"dim": hDim, "shared": False}, 
+            interactions, _ = ops.mul(images, memory, inDim, proj = {"dim": hDim, "shared": False}, 
                 interMod = config.baselineAttType)
             
             attention = ops.inter2att(interactions, hDim)
