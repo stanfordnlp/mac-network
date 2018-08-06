@@ -8,9 +8,6 @@ See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](ht
 
 In particular, the implementation includes the MAC cell at [`mac_cell.py`](mac_cell.py). The code supports the standard cell as presented in the paper as well as additional extensions and variants. Run `python main.py -h` or see [`config.py`](config.py) for the complete list of options.
 
-[https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png]
-
-
 ## Requirements
 - Tensorflow (originally has been developed with 1.3 but should work for later versions as well).
 - We have performed experiments on Maxwell Titan X GPU. We assume 12GB of GPU memory.
