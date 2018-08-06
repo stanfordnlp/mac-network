@@ -8,10 +8,7 @@ See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](ht
 
 In particular, the implementation includes the MAC cell at [`mac_cell.py`](mac_cell.py). The code supports the standard cell as presented in the paper as well as additional extensions and variants. Run `python main.py -h` or see [`config.py`](config.py) for the complete list of options.
 
-<div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="390px">
-  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/visual.png" style="float:right" width="480px">
-</div>
+
 
 ## Requirements
 - Tensorflow (originally has been developed with 1.3 but should work for later versions as well).
