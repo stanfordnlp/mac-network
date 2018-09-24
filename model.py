@@ -169,7 +169,7 @@ class MACnet(object):
                 addLoc = config.locationAware
 
             if config.stemLinear:
-                features = opt.linear(images, inDim, outDim)
+                features = ops.linear(images, inDim, outDim)
             else:
                 dims = [inDim] + ([config.stemDim] * (config.stemNumLayers - 1)) + [outDim]
 
