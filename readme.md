@@ -9,7 +9,7 @@ See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](ht
 In particular, the implementation includes the MAC cell at [`mac_cell.py`](mac_cell.py). The code supports the standard cell as presented in the paper as well as additional extensions and variants. Run `python main.py -h` or see [`config.py`](config.py) for the complete list of options.
 
 <div align="center">
-  <img src="https://preview.ibb.co/eKOrRU/cell.png" style="float:left" width="390px">
+  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="390px">
   <img src="https://preview.ibb.co/j0nwt9/visual.png" style="float:right" width="480px">
 </div>
 
