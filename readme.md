@@ -10,7 +10,7 @@ In particular, the implementation includes the MAC cell at [`mac_cell.py`](mac_c
 
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="390px">
-  <img src="https://preview.ibb.co/j0nwt9/visual.png" style="float:right" width="480px">
+  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/visual.png" style="float:right" width="480px">
 </div>
 
 ## Requirements
