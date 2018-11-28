@@ -203,7 +203,7 @@ def main():
 
         iterations = range(1, length + 1)
         questionList = results[i]["question"].split(" ")
-        table = np.array(results[i]["attentions"]["question"])[:,:len(questionList)]        
+        table = np.array(results[i]["attentions"]["question"])[:,:(len(questionList) + 1)]        
         showTableAtt(results[i], table, iterations, questionList, "text")
 
         if args.sa:
