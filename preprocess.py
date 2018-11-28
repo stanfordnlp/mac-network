@@ -659,7 +659,7 @@ class Preprocesser(object):
             extraDataset = self.readDataset(suffix = "H", hasTrain = (not config.extraVal))          
             # extra dataset uses the same images
             if not config.extraVal:
-                for tier in extraData:
+                for tier in extraDataset:
                     extraDataset[tier]["images"] = mainDataset[tier]["images"]
 
         print("took {:.2f} seconds".format(time.time() - start))
