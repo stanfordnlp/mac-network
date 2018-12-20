@@ -69,7 +69,7 @@ python main.py --expName "experiment1" --train --testedNum 10000 --epochs 25 --n
 
 See [`config.py`](config.py) for further available options (Note that some of them are still in an experimental stage).
 
-## Evalutation
+## Evaluation
 To evaluate the trained model, and get predictions and attention maps, run the following: 
 ```bash
 python main.py --expName "clevrExperiment" --finalTest --testedNum 10000 --netLength 16 -r --getPreds --getAtt @configs/args.txt
