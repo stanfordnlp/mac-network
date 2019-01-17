@@ -20,7 +20,7 @@ MAC is a fully differentiable model that learns to perform multi-step reasoning.
 
 Let's begin from cloning this reponsitory branch:
 ```
-git clone -b GQA https://github.com/stanfordnlp/mac-network.git
+git clone -b gqa https://github.com/stanfordnlp/mac-network.git
 ```
 
 ## Pre-processing
