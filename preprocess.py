@@ -6,8 +6,12 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 from termcolor import colored
-from program_translator import ProgramTranslator #
+from program_translator import ProgramTranslator
 from config import config
+from nltk.tokenize import word_tokenize
+import re
+import math
+from collections import defaultdict
 
 # Print bold tex
 def bold(txt):
@@ -54,7 +58,7 @@ Encodes text into integers. Keeps dictionary between string words (symbols)
 and their matching integers. Supports encoding and decoding.
 '''
 class SymbolDict(object):
-    def __init__(self, empty = False):
+    def __init__(self, empty = False): 
         self.padding = "<PAD>"
         self.unknown = "<UNK>"
         self.start = "<START>"
@@ -63,8 +67,8 @@ class SymbolDict(object):
         self.invalidSymbols = [self.padding, self.unknown, self.start, self.end]
 
         if empty:
-            self.sym2id = {} 
-            self.id2sym = []            
+            self.sym2id = {self.padding: 0} 
+            self.id2sym = [self.padding]            
         else:
             self.sym2id = {self.padding: 0, self.unknown: 1, self.start: 2, self.end: 3} 
             self.id2sym = [self.padding, self.unknown, self.start, self.end]
@@ -73,49 +77,73 @@ class SymbolDict(object):
     def getNumSymbols(self):
         return len(self.sym2id)
 
-    def isPadding(self, enc):
-        return enc == 0
-
-    def isUnknown(self, enc):
-        return enc == 1
-
-    def isStart(self, enc):
-        return enc == 2
-
-    def isEnd(self, enc):
-        return enc == 3
-
     def isValid(self, enc):
-        return enc < self.getNumSymbols() and enc >= len(self.invalidSymbols)
+        return enc not in self.invalidSymbols
 
     def resetSeqs(self):
         self.allSeqs = []
 
-    def addSeq(self, seq):
+    def addSymbols(self, seq):
+        if type(seq) is not list:
+            seq = [seq]
         self.allSeqs += seq
 
-    # Call to create the words-to-integers vocabulary after (reading word sequences with addSeq).
-    def createVocab(self, minCount = 0):
+    # Call to create the words-to-integers vocabulary after (reading word sequences with addSymbols). 
+    def addToVocab(self, symbol):
+        if symbol not in self.sym2id:
+            self.sym2id[symbol] = self.getNumSymbols()
+            self.id2sym.append(symbol)
+
+    # create vocab only if not existing..?
+    def createVocab(self, minCount = 0, top = 0, addUnk = False, weights = False):
         counter = {}
         for symbol in self.allSeqs:
             counter[symbol] = counter.get(symbol, 0) + 1
-        for symbol in counter:
-            if counter[symbol] > minCount and (symbol not in self.sym2id):
-                self.sym2id[symbol] = self.getNumSymbols()
-                self.id2sym.append(symbol)
+        
+        isTop = lambda symbol: True
+        if top > 0:
+            topItems = sorted(counter.items(), key = lambda x: x[1], reverse = True)[:top]
+            tops = [k for k,v in topItems]
+            isTop = lambda symbol: symbol in tops 
 
+        if addUnk:
+            self.addToVocab(self.unknown)
+
+        for symbol in counter:
+            if counter[symbol] > minCount and isTop(symbol):
+                self.addToVocab(symbol)
+
+        self.counter = counter
+
+        self.counts = np.array([counter.get(sym,0) for sym in self.id2sym])
+        
+        if weights:
+            self.weights = np.array([1.0 for sym in self.id2sym])
+            if config.ansWeighting:
+                weight = lambda w:  1.0 / float(w) if w > 0 else 0.0
+                self.weights = np.array([weight(counter.get(sym,0)) for sym in self.id2sym])
+                totalWeight = np.sum(self.weights)
+                self.weights /= totalWeight
+                self.weights *= len(self.id2sym)
+            elif config.ansWeightingRoot:
+                weight = lambda w:  1.0 / math.sqrt(float(w)) if w > 0 else 0
+                self.weights = np.array([weight(counter.get(sym,0)) for sym in self.id2sym])
+                totalWeight = np.sum(self.weights)
+                self.weights /= totalWeight
+                self.weights *= len(self.id2sym)
+    
     # Encodes a symbol. Returns the matching integer.
     def encodeSym(self, symbol):
         if symbol not in self.sym2id:
             symbol = self.unknown
-        return self.sym2id[symbol]
+        return self.sym2id[symbol] # self.sym2id.get(symbol, None) # # -1 VQA MAKE SURE IT DOESNT CAUSE BUGS
 
     '''
     Encodes a sequence of symbols.
     Optionally add start, or end symbols. 
     Optionally reverse sequence 
     '''
-    def encodeSequence(self, decoded, addStart = False, addEnd = False, reverse = False):
+    def encodeSeq(self, decoded, addStart = False, addEnd = False, reverse = False):
         if reverse:
             decoded.reverse()
         if addStart:
@@ -134,10 +162,11 @@ class SymbolDict(object):
     If delim is given, joins the symbols using delim,
     Optionally reverse the resulted sequence 
     '''
-    def decodeSequence(self, encoded, delim = None, reverse = False, stopAtInvalid = True):
+    def decodeSeq(self, encoded, delim = None, reverse = False, stopAtInvalid = True):
         length = 0
         for i in range(len(encoded)):
-            if not self.isValid(encoded[i]) and stopAtInvalid:
+            if not self.isValid(self.decodeId(encoded[i])) and stopAtInvalid:
+            #if not self.isValid(encoded[i]) and stopAtInvalid:
                 break
             length += 1
         encoded = encoded[:length]
@@ -164,8 +193,9 @@ By calling preprocess, the class:
 class Preprocesser(object):
     def __init__(self):
         self.questionDict = SymbolDict()
-        self.answerDict = SymbolDict(empty = True)
+        self.answerDict = SymbolDict(empty = True) 
         self.qaDict = SymbolDict()
+        self.loadVocabs()
 
         self.specificDatasetDicts = None
 
@@ -186,9 +216,59 @@ class Preprocesser(object):
     '''
     # sentence tokenizer
     allPunct = ["?", "!", "\\", "/", ")", "(", ".", ",", ";", ":"]
-    def tokenize(self, text, ignoredPuncts = ["?", "!", "\\", "/", ")", "("], 
-        keptPuncts = [".", ",", ";", ":"], endPunct = [">", "<", ":"], delim = " ", 
-        clean = False, replacelistPre = dict(), replacelistPost = dict()):
+    fullPunct = [";", r"/", "[", "]", '"', "{", "}", "(", ")", "=", 
+                    "+", "\\", "_", "-",">", "<", "@", "`", ",", "?", "!", "%", 
+                    "^", "&", "*", "~", "#", "$"]
+    contractions = {"aint": "ain't", "arent": "aren't", "cant": "can't", "couldve": "could've", "couldnt": "couldn't", \
+                     "couldn'tve": "couldn't've", "couldnt've": "couldn't've", "didnt": "didn't", "doesnt": "doesn't", "dont": "don't", "hadnt": "hadn't", \
+                     "hadnt've": "hadn't've", "hadn'tve": "hadn't've", "hasnt": "hasn't", "havent": "haven't", "hed": "he'd", "hed've": "he'd've", \
+                     "he'dve": "he'd've", "hes": "he's", "howd": "how'd", "howll": "how'll", "hows": "how's", "Id've": "I'd've", "I'dve": "I'd've", \
+                     "Im": "I'm", "Ive": "I've", "isnt": "isn't", "itd": "it'd", "itd've": "it'd've", "it'dve": "it'd've", "itll": "it'll", "let's": "let's", \
+                     "maam": "ma'am", "mightnt": "mightn't", "mightnt've": "mightn't've", "mightn'tve": "mightn't've", "mightve": "might've", \
+                     "mustnt": "mustn't", "mustve": "must've", "neednt": "needn't", "notve": "not've", "oclock": "o'clock", "oughtnt": "oughtn't", \
+                     "ow's'at": "'ow's'at", "'ows'at": "'ow's'at", "'ow'sat": "'ow's'at", "shant": "shan't", "shed've": "she'd've", "she'dve": "she'd've", \
+                     "she's": "she's", "shouldve": "should've", "shouldnt": "shouldn't", "shouldnt've": "shouldn't've", "shouldn'tve": "shouldn't've", \
+                     "somebody'd": "somebodyd", "somebodyd've": "somebody'd've", "somebody'dve": "somebody'd've", "somebodyll": "somebody'll", \
+                     "somebodys": "somebody's", "someoned": "someone'd", "someoned've": "someone'd've", "someone'dve": "someone'd've", \
+                     "someonell": "someone'll", "someones": "someone's", "somethingd": "something'd", "somethingd've": "something'd've", \
+                     "something'dve": "something'd've", "somethingll": "something'll", "thats": "that's", "thered": "there'd", "thered've": "there'd've", \
+                     "there'dve": "there'd've", "therere": "there're", "theres": "there's", "theyd": "they'd", "theyd've": "they'd've", \
+                     "they'dve": "they'd've", "theyll": "they'll", "theyre": "they're", "theyve": "they've", "twas": "'twas", "wasnt": "wasn't", \
+                     "wed've": "we'd've", "we'dve": "we'd've", "weve": "we've", "werent": "weren't", "whatll": "what'll", "whatre": "what're", \
+                     "whats": "what's", "whatve": "what've", "whens": "when's", "whered": "where'd", "wheres": "where's", "whereve": "where've", \
+                     "whod": "who'd", "whod've": "who'd've", "who'dve": "who'd've", "wholl": "who'll", "whos": "who's", "whove": "who've", "whyll": "why'll", \
+                     "whyre": "why're", "whys": "why's", "wont": "won't", "wouldve": "would've", "wouldnt": "wouldn't", "wouldnt've": "wouldn't've", \
+                     "wouldn'tve": "wouldn't've", "yall": "y'all", "yall'll": "y'all'll", "y'allll": "y'all'll", "yall'd've": "y'all'd've", \
+                     "y'alld've": "y'all'd've", "y'all'dve": "y'all'd've", "youd": "you'd", "youd've": "you'd've", "you'dve": "you'd've", \
+                     "youll": "you'll", "youre": "you're", "youve": "you've"}
+    nums = { "none": "0", "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+             "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10"}
+    articles = {"a": "", "an": "", "the": ""}
+    allReplaceQ = {}
+    for replace in [contractions, nums, articles]: # , 
+        allReplaceQ.update(replace)
+    
+    allReplaceA = {}
+    for replace in [contractions, nums]: # , 
+        allReplaceA.update(replace)
+
+    periodStrip = lambda self, s: re.sub(r"(?!<=\d)(\.)(?!\d)", " ", s) # :,' ?
+    collonStrip = lambda self, s: re.sub(r"(?!<=\d)(:)(?!\d)", " ", s) # replace with " " or ""?
+    commaNumStrip = lambda self, s: re.sub(r"(\d)(\,)(\d)", r"\1\3", s)
+
+    # remove any non a-zA-Z0-9?
+    vqaProcessText = lambda self, text, tokenize, question: self.processText(text, ignoredPunct = [], keptPunct = [], 
+        endPunct = [], delimPunct = self.fullPunct, replacelistPost = self.allReplaceQ if question else self.allReplaceA, reClean = True, tokenize = tokenize)
+
+    def processText(self, text, ignoredPunct = ["?", "!", "\\", "/", ")", "("], 
+        keptPunct = [".", ",", ";", ":"], endPunct = [">", "<", ":"], delimPunct = [],
+        delim = " ", clean = False, replacelistPre = dict(), replacelistPost = dict(),
+        reClean = False, tokenize = True):
+
+        if reClean:
+            text = self.periodStrip(text)
+            text = self.collonStrip(text)
+            text = self.commaNumStrip(text)
 
         if clean:
             for word in replacelistPre:
@@ -206,50 +286,70 @@ class Preprocesser(object):
                     print(text)
                     print("")
 
-        for punct in keptPuncts:
+        for punct in keptPunct:
             text = text.replace(punct, delim + punct + delim)           
         
-        for punct in ignoredPuncts:
+        for punct in ignoredPunct:
             text = text.replace(punct, "")
 
-        ret = text.lower().split(delim)
+        for punct in delimPunct:
+            text = text.replace(punct, delim)
 
-        if clean:
-            origRet = ret
-            ret = [replacelistPost.get(word, word) for word in ret]
-            if origRet != ret:
-                print(origRet)
-                print(ret)
+        text = text.lower()
+
+        if config.tokenizer == "stanford":
+            ret = StanfordTokenizer().tokenize(text)
+        elif config.tokenizer == "nltk":
+            ret = word_tokenize(text)
+        else:    
+            ret = text.split() # delim
+
+        ret = [replacelistPost.get(word, word) for word in ret]
 
         ret = [t for t in ret if t != ""]
+        if not tokenize:
+            ret = delim.join(ret)
+
         return ret
 
-
-    # Read class' generated files.
+    # Read class generated files.
     # files interface
-    def readFiles(self, instancesFilename):
+    def readInstances(self, instancesFilename):
         with open(instancesFilename, "r") as inFile:
             instances = json.load(inFile)
-        
-        with open(config.questionDictFile(), "rb") as inFile:
-            self.questionDict = pickle.load(inFile)
+        return instances
 
-        with open(config.answerDictFile(), "rb") as inFile:
-            self.answerDict = pickle.load(inFile)
-
-        with open(config.qaDictFile(), "rb") as inFile:
-            self.qaDict = pickle.load(inFile)
-
-        return instances 
-    
     '''
     Generate class' files. Save json representation of instances and
     symbols-to-integers dictionaries.  
     '''
-    def writeFiles(self, instances, instancesFilename):
+    def writeInstances(self, instances, instancesFilename):
         with open(instancesFilename, "w") as outFile:
             json.dump(instances, outFile)
 
+    def setVocabs(self):
+        self.createVocabs()
+        self.writeVocabs()
+
+    def createVocabs(self):
+        ansAddUnk = True
+        self.questionDict.createVocab(minCount = config.wrdEmbQMinCount, top = config.wrdEmbQTop)
+        self.answerDict.createVocab(minCount = config.wrdEmbAMinCount, top = config.wrdEmbATop, addUnk = ansAddUnk, weights = True) # config
+        self.qaDict.createVocab(minCount = config.wrdEmbQMinCount)
+
+    def loadVocabs(self):
+        if os.path.exists(config.qaDictFile()):
+            print("load dictionaries")
+            with open(config.questionDictFile(), "rb") as inFile:
+                self.questionDict = pickle.load(inFile)
+
+            with open(config.answerDictFile(), "rb") as inFile:
+                self.answerDict = pickle.load(inFile)
+
+            with open(config.qaDictFile(), "rb") as inFile:
+                self.qaDict = pickle.load(inFile)
+
+    def writeVocabs(self):
         with open(config.questionDictFile(), "wb") as outFile:
             pickle.dump(self.questionDict, outFile)
 
@@ -267,75 +367,326 @@ class Preprocesser(object):
         sortedPreds = sorted(preds, key = lambda instance: instance["index"]) 
         with open(config.predsFile(tier + suffix), "w") as outFile:
             outFile.write(json.dumps(sortedPreds))
-        with open(config.answersFile(tier + suffix), "w") as outFile:
-            for instance in sortedPreds:
-                writeline(outFile, instance["prediction"])
+        
+        answersFile = config.answersFile(tier + suffix)
+        if config.dataset == "CLEVR":    
+            with open(answersFile, "w") as outFile:
+                for instance in sortedPreds:
+                    writeline(outFile, instance["prediction"])
+        else:
+            with open(answersFile, "w") as outFile:
+                results = [{"question_id": instance.get("questionId", "NONE"), 
+                            "answer": instance["prediction"]} 
+                        for instance in sortedPreds]
+                outFile.write(json.dumps(results))
     
     # Reads NLVR data entries and create a json dictionary.
-    def readNLVR(self, datasetFilename, instancesFilename, train):
+    def readNLVR(self, datasetFilename, instancesFilename, tier, train, imageIndex):
         instances = []
         i = 0 
 
         if os.path.exists(instancesFilename):
-            instances = self.readFiles(instancesFilename)
+            instances = self.readInstacnes(instancesFilename)
         else:
             with open(datasetFilename, "r") as datasetFile:               
                 for line in datasetFile:
                     instance = json.loads(line)
-                    question = instance["sentence"]
-                    questionSeq = self.tokenize(question, 
-                        ignoredPuncts = Preprocesser.allPunct, keptPuncts = [])
+                    questionStr = instance["sentence"]
+                    question = self.processText(questionStr, 
+                        ignoredPunct = Preprocesser.allPunct, keptPunct = [])
 
-                    if train or (not config.wrdEmbUnknown):
-                        self.questionDict.addSeq(question)
-                        self.qaDict.addSeq(question)
+                    if train or (not config.wrdEmbQUnk):
+                        self.questionDict.addSymbols(question)
+                        self.qaDict.addSymbols(question)
 
                     answer = instance["label"]
-                    self.answerDict.addSeq([answer])
-                    self.qaDict.addSeq([answer])
+                    if train or (not config.wrdEmbAUnk):
+                        self.answerDict.addSymbols(answer)
+                        self.qaDict.addSymbols(answer)
 
+                    imageId = instance["identifier"] + "-" + str(k)
+                    imageIdx = imageIndex[imageId]["idx"]
+                    # int(imageId) if imageIndex is None else imageIndex[imageId]["idx"]
+                    
                     for k in range(6):
                         instances.append({
+                            "questionStr": questionStr,
                             "question": question,
-                            "questionSeq": questionSeq,
                             "answer": answer,
-                            "imageId": instance["identifier"] + "-" + str(k),
+                            "imageId": {"group": tier, "id": imageId, "idx": imageIdx}, # imageInfo[imageId]["idx"]
+                            "tier": tier,
                             "index": i
                             })
                         i += 1
 
                 random.shuffle(instances)
 
-                self.questionDict.createVocab()
-                self.answerDict.createVocab()
-                self.qaDict.createVocab()
-
-                self.writeFiles(instances, instancesFilename)
+                self.writeInstances(instances, instancesFilename)
 
         return instances
 
+    def readVQA(self, datasetFilename, instancesFilename, tier, updateVocab, imageIndex = None):
+        vocabq = set(json.load(open("newqVocabFileVQA.json")))
+        vocaba = set(json.load(open("newaVocabFileVQA.json")))
+        counterq = 0
+        countera = 0        
+        instances = []
+        qId2idx = {}
+        annotationsFilename = config.annotationsFile(tier)
+        pairsFilename = config.pairsFile(tier)
+        
+        if os.path.exists(instancesFilename):
+            instances = self.readInstances(instancesFilename)
+        else:
+            with open(datasetFilename[0], "r") as questionsFile:
+                questions = json.load(questionsFile)["questions"]            
+            
+            index = 0
+
+            for i in tqdm(range(len(questions)), desc = "Preprocessing"):
+                instance = questions[i]
+
+                questionStr = instance["question"]
+                question = self.vqaProcessText(questionStr, True, True)
+
+                qlist = question + ["?", " ", " ", " "]
+
+                if config.questionLim > 0 and len(question) > config.questionLim:
+                    continue
+
+                if updateVocab or (not config.wrdEmbQUnk):
+                    self.questionDict.addSymbols(question)
+                    self.qaDict.addSymbols(question)
+
+                choices, choiceStrs = None, None
+                if config.ansFormat == "mc":
+                    choiceStrs = instance["multiple_choices"]
+                    choices = []
+                    for choiceStr in choiceStrs:
+                        choice = self.vqaProcessText(choiceStr, config.ansTokenize, False)
+                        if updateVocab or (not config.wrdEmbAUnk):
+                            self.answerDict.addSymbols(choice)
+                            self.qaDict.addSymbols(choice)
+                        choices.append(choice)
+                    choices = list(set(choices))    
+                    
+                    if len(choices) != len(choiceStrs):
+                        print(choiceStrs)
+                        print(choices)
+
+                imageId = instance["image_id"]
+                imageInfo = imageIndex[str(imageId)]
+
+                ccounts = {"verbs": 0, "nouns": 0, "adj": 0, "preps": 0, "conj": 0}
+                trans = {"VERB": "verbs", "NOUN": "nouns", "ADJ": "adj", "ADP": "preps", "CONJ": "conj"}
+
+                if all([(x in vocabq) for x in questionStr[:-1].split()]):
+                    counterq += 1
+
+                instances.append({
+                    "questionStr": questionStr,
+                    "question": question,
+                    "questionId": instance["question_id"],
+                    "answer": "yes" if config.ansFormat == "oe" else 0, # Dummy answer
+                    "answerFreq": ["yes"], # Dummy answer
+                    "imageId": {"group": tier, "id": imageId, "idx": imageInfo["idx"]},
+                    "choiceStrs": choiceStrs,
+                    "choices": choices,              
+                    "tier": tier,
+                    "index": index
+                })               
+
+                if config.imageObjects:
+                    instances[-1]["objectsNum"] = imageInfo["objectsNum"]
+
+                qId2idx[instance["question_id"]] = index
+                index += 1
+
+            if tier != "test":
+                with open(annotationsFilename, "r") as annotationsFile:
+                    annotations = json.load(annotationsFile)["annotations"]            
+                for i in tqdm(range(len(annotations)), desc = "Preprocessing"):
+                    instance = annotations[i]
+                    if instance["question_id"] not in qId2idx:
+                        continue
+                    idx = qId2idx[instance["question_id"]]
+                    answerStr = instance["multiple_choice_answer"]
+                    answer = self.vqaProcessText(answerStr, config.ansTokenize, False)
+                    if config.ansFormat == "mc":
+                        answer = instances[idx]["choices"].index(answer)
+                    
+                    answerFreqStrs = []
+                    answerFreq = []
+
+                    if instance["multiple_choice_answer"] in vocaba:
+                        countera += 1
+
+                    for answerData in instance["answers"]:
+                        answerStr = answerData["answer"]
+                        answer = self.vqaProcessText(answerStr, config.ansTokenize, False)
+                        if updateVocab or (not config.wrdEmbAUnk):
+                            self.answerDict.addSymbols(answer)
+                            self.qaDict.addSymbols(answer)
+                        answerFreqStrs.append(answerStr)
+                        answerFreq.append(answer)
+
+                    instances[idx].update({
+                            "answerStr": answerStr,
+                            "answer": answer,
+                            "answerFreqStrs": answerFreqStrs,
+                            "answerFreq": answerFreq,
+                            "questionType": instance["question_type"],
+                            "answerType": instance["answer_type"]
+                            })
+
+                if config.dataVer == 2:
+                    with open(pairsFilename, "r") as pairsFile:
+                        pairs = json.load(pairsFile)
+                    for pair in pairs:
+                        if pair[0] in qId2idx: 
+                            instances[qId2idx[pair[0]]]["complementary"] = qId2idx.get(pair[1],None)
+                        if pair[1] in qId2idx:
+                            instances[qId2idx[pair[1]]]["complementary"] = qId2idx.get(pair[0],None)
+
+            random.shuffle(instances)
+            self.writeInstances(instances, instancesFilename)
+
+        return instances       
+
+    def filterUnk(self, dataset, tier, filterInstances):
+        print("filtering unknown answers " + tier)
+        totalScore = 0.0
+        numQuestions = float(len(dataset["instances"]))
+        for instance in dataset["instances"]:
+            instance["answerFreq"] = [answer for answer in instance["answerFreq"] if 
+                answer in self.answerDict.sym2id]
+
+            answersSet = {}
+            for answer in instance["answerFreq"]:
+                answersSet[answer] = answersSet.get(answer, 0) + 1
+
+            bestAnswer = "<>"
+            bestCount = 0
+            for answer in answersSet:
+                if answersSet[answer] > bestCount:
+                    bestAnswer = answer
+                    bestCount = answersSet[answer]
+
+            totalScore += min(bestCount * 0.3, 1)
+
+        print("max score {}".format(totalScore / numQuestions))
+
+        if filterInstances:
+            if config.lossType in ["softmax", "svm", "probSoftmax"]:
+                dataset["instances"] = [instance for instance in dataset["instances"] if 
+                    instance["answer"] in self.answerDict.sym2id]
+            # else:
+                dataset["instances"] = [instance for instance in dataset["instances"] if 
+                    len(instance["answerFreq"]) > 0]
+
     # Reads CLEVR data entries and create a json dictionary.
-    def readCLEVR(self, datasetFilename, instancesFilename, train):
+    def readVG(self, datasetFilename, instancesFilename, tier, updateVocab, imageIndex = None):
         instances = []
 
         if os.path.exists(instancesFilename):
-            instances = self.readFiles(instancesFilename)
+            instances = self.readInstances(instancesFilename)
         else:
-            with open(datasetFilename, "r") as datasetFile:
+            with open(datasetFilename[0], "r") as datasetFile:
+                data = json.load(datasetFile)
+            for i in tqdm(range(len(data)), desc = "Preprocessing"):
+                instance = data[i]
+                for q in instance["qas"]:
+                    questionStr = q["question"]
+                    question = self.processText(questionStr)
+
+                    if updateVocab or (not config.wrdEmbQUnk):
+                        self.questionDict.addSymbols(question)
+                        self.qaDict.addSymbols(question)
+
+                    answer = instance.get("answer", "yes") # DUMMY_ANSWER
+                    
+                    if updateVocab or (not config.wrdEmbAUnk):
+                        self.answerDict.addSymbols(answer)
+                        self.qaDict.addSymbols(answer)
+
+                    # pass other fields to instance?
+                    instances.append({
+                            "questionStr": questionStr,
+                            "question": question,
+                            "answer": answer,
+                            "imageId": {"group": tier, "id": 0, "idx": 0},
+                            "tier": tier,
+                            "index": i
+                            })
+
+            random.shuffle(instances)
+
+            self.writeInstances(instances, instancesFilename)
+
+        return instances
+
+    def readV7W(self, datasetFilename, instancesFilename, tier, updateVocab, imageIndex = None):
+        instances = []
+
+        if os.path.exists(instancesFilename):
+            instances = self.readInstances(instancesFilename)
+        else:
+            with open(datasetFilename[0], "r") as datasetFile:
+                data = json.load(datasetFile)["images"]
+            for i in tqdm(range(len(data)), desc = "Preprocessing"):
+                instance = data[i]
+                for q in instance["qa_pairs"]:
+                    questionStr = q["question"]
+                    question = self.processText(questionStr)
+
+                    if updateVocab or (not config.wrdEmbQUnk):
+                        self.questionDict.addSymbols(question)
+                        self.qaDict.addSymbols(question)
+
+                    answer = instance.get("answer", "yes") # DUMMY_ANSWER
+                    
+                    if updateVocab or (not config.wrdEmbAUnk):
+                        self.answerDict.addSymbols(answer)
+                        self.qaDict.addSymbols(answer)
+
+                    instances.append({
+                            "questionStr": questionStr,
+                            "question": question,
+                            "answer": answer,
+                            "imageId": {"group": tier, "id": instance["image_id"], "idx": instance["image_id"]},
+                            "tier": tier,
+                            "index": i
+                            })
+
+            random.shuffle(instances)
+
+            self.writeInstances(instances, instancesFilename)
+
+        return instances
+
+    def readCLEVR(self, datasetFilename, instancesFilename, tier, updateVocab, imageIndex = None):
+        instances = []
+
+        if os.path.exists(instancesFilename):
+            instances = self.readInstances(instancesFilename)
+        else:
+            with open(datasetFilename[0], "r") as datasetFile:
                 data = json.load(datasetFile)["questions"]            
             for i in tqdm(range(len(data)), desc = "Preprocessing"):
                 instance = data[i]
 
-                question = instance["question"]
-                questionSeq = self.tokenize(question)
+                questionStr = instance["question"]
+                question = self.processText(questionStr)
 
-                if train or (not config.wrdEmbUnknown):
-                    self.questionDict.addSeq(questionSeq)
-                    self.qaDict.addSeq(questionSeq)
+                if updateVocab or (not config.wrdEmbQUnk):
+                    self.questionDict.addSymbols(question)
+                    self.qaDict.addSymbols(question)
 
                 answer = instance.get("answer", "yes") # DUMMY_ANSWER
-                self.answerDict.addSeq([answer])
-                self.qaDict.addSeq([answer])
+                
+                if updateVocab or (not config.wrdEmbAUnk):
+                    self.answerDict.addSymbols(answer)
+                    self.qaDict.addSymbols(answer)
 
                 dummyProgram = [{"function": "FUNC", "value_inputs": [], "inputs": []}]
                 program = instance.get("program", dummyProgram)
@@ -344,101 +695,223 @@ class Preprocesser(object):
                 programInputs = self.programTranslator.programToInputs(postfixProgram, 
                     offset = 2)
 
-                # pass other fields to instance?
                 instances.append({
+                        "questionStr": questionStr,
                         "question": question,
-                        "questionSeq": questionSeq,
                         "answer": answer,
-                        "imageId": instance["image_index"],
+                        "imageId": {"group": tier, "id": instance["image_index"], "idx": instance["image_index"]},
                         "program": program,
                         "programSeq": programSeq,
                         "programInputs": programInputs,
+                        "tier": tier,
                         "index": i
                         })
 
             random.shuffle(instances)
 
-            self.questionDict.createVocab()
-            self.answerDict.createVocab()
-            self.qaDict.createVocab()
-
-            self.writeFiles(instances, instancesFilename)
+            self.writeInstances(instances, instancesFilename)
 
         return instances
+
+    def readGQA(self, datasetFilename, instancesFilename, tier, updateVocab, imageIndex = None):
+        instances = []
+        if os.path.exists(instancesFilename):
+            instances = self.readInstances(instancesFilename)
+        else:
+            data = []
+            datal1, datal2 = None, None
+            for vf in datasetFilename:
+                with open(vf, "r") as datasetFile:
+                    data += json.load(datasetFile)["questions"]
+                    if (datal1 is None):
+                        datal1 = len(data)
+                    if datal2 is None:
+                        datal2 = len(data)
+
+            for i in tqdm(range(len(data)), desc = "Preprocessing"):
+                instance = data[i]
+
+                questionStr = instance["question"]
+                question = self.processText(questionStr)
+
+                qlist = question + ["?", " ", " ", " "]
+
+                if (i < datal1) and (updateVocab or (not config.wrdEmbQUnk)):
+                    self.questionDict.addSymbols(question)
+                    self.qaDict.addSymbols(question)
+
+                answer = instance.get("answer", "yes") # DUMMY_ANSWER
+                
+                if (i < datal2) and (updateVocab or (not config.wrdEmbAUnk)):
+                    self.answerDict.addSymbols(answer)
+                    self.qaDict.addSymbols(answer)
+
+                imageId = instance["imageId"]
+                imageInfo = imageIndex[str(imageId)]
+
+                instances.append({
+                        "questionStr": questionStr,
+                        "question": question,
+                        "answer": answer,
+                        "imageId": {"group": tier, "id": imageId, "idx": imageInfo["idx"]},
+                        "tier": tier,
+                        "index": i,
+                        "questionId": instance["questionId"]
+                        })
+
+                if config.imageObjects:
+                    instances[-1]["objectsNum"] = imageInfo["objectsNum"]
+
+                if "type" in instance:
+                    instances[-1]["type"] = instance["type"]
+                if "group" in instance:
+                    instances[-1]["group"] = instance["group"]
+
+            random.shuffle(instances)
+
+            self.writeInstances(instances, instancesFilename)
+
+        return instances
+
+    def encodeQuestionStr(self, questionStr):
+        qDict = self.qaDict if config.ansEmbMod == "SHARED" else self.questionDict
+        question = self.vqaProcessText(questionStr, True, True)
+        return question
 
     '''
     Reads data in datasetFilename, and creates json dictionary.
     If instancesFilename exists, restore dictionary from this file.
     Otherwise, save created dictionary to instancesFilename.
     '''
-    def readData(self, datasetFilename, instancesFilename, train):
+    def readData(self, datasetFilename, instancesFilename, tier, updateVocab, imageIndex):
         # data extraction
         datasetReader = {
+            "VG": self.readVG,
+            "V7W": self.readV7W,
             "CLEVR": self.readCLEVR,
-            "NLVR": self.readNLVR
+            "NLVR": self.readNLVR,
+            "VQA": self.readVQA,
+            "GQA": self.readGQA
         }
 
-        return datasetReader[config.dataset](datasetFilename, instancesFilename, train)
+        return datasetReader[config.dataset](datasetFilename, instancesFilename, tier, updateVocab, imageIndex)
 
     # Reads dataset tier (train, val, test) and returns the loaded instances 
     # and image relevant filenames
     def readTier(self, tier, train):
+        print("Reading tier {}".format(tier))
         imagesFilename = config.imagesFile(tier)
-        datasetFilename = config.datasetFile(tier)
-        instancesFilename = config.instancesFile(tier)
-        
-        instances = self.readData(datasetFilename, instancesFilename, train)
+        if tier == "val" and config.valFilenames != []:
+            datasetFilename = [config.datasetFile(tier)] + [config.dataFile(vf) for vf in config.valFilenames]
+            instancesFilename = config.instancesFile("finalspecialVallls")
+        else:
+            datasetFilename = [config.datasetFile(tier)]
+            instancesFilename = config.instancesFile(tier)
 
-        images = {"imagesFilename": imagesFilename}
-        if config.dataset == "NLVR":
-            images["imageIdsFilename"] = config.imagesIdsFile(tier)
-            
-        return {"instances": instances, "images": images, "train": train}
+        imgsInfoFilename = config.imgsInfoFile(tier)        
+        try:
+            with open(imgsInfoFilename, "r") as file:
+                imageIndex = json.load(file)  
+        except:
+            imageIndex = "dd"
+        instances = self.readData(datasetFilename, instancesFilename, tier, train, imageIndex) # updateVocab = 
+
+        images = {tier: {"imagesFilename": imagesFilename, "imgsInfoFilename": imgsInfoFilename}}       
+
+        return {"instances": instances, "images": images, "train": train} # 
 
     '''
     Reads all tiers of a dataset (train if exists, val, test).
     Creates also evalTrain tier which will optionally be used for evaluation. 
     '''
-    def readDataset(self, suffix = "", hasTrain = True):
-        dataset = {"train": None, "evalTrain": None, "val": None, "test": None}        
+    def readDataset(self, suffix = "", hasTrain = True, trainOnVal = False):
+        dataset = {"train": None, "evalTrain": None, "val": None, "test": None}
         if hasTrain:
             dataset["train"] = self.readTier("train" + suffix, train = True)
-        dataset["val"] = self.readTier("val" + suffix, train = False)
+
+        dataset["val"] = self.readTier("val" + suffix, train = trainOnVal)
         dataset["test"] = self.readTier("test" + suffix, train = False)
-        
+
         if hasTrain:
             dataset["evalTrain"] = {}
             for k in dataset["train"]:
                 dataset["evalTrain"][k] = dataset["train"][k]
             dataset["evalTrain"]["train"] = False
 
+        if trainOnVal:
+            trainLen = len(dataset["train"]["instances"])
+            for instance in dataset["val"]["instances"]:
+                instance["index"] += trainLen
+                if "complementary" in instance:
+                    instance["complementary"] += trainLen
+            if config.valSplit > 0:
+                dataset["train"]["instances"] += dataset["val"]["instances"][config.valSplit:]
+                dataset["val"]["instances"] = dataset["val"]["instances"][:config.valSplit]
+                print(len(dataset["train"]["instances"]))
+                print(len(dataset["val"]["instances"]))
+            dataset["train"]["images"].update(dataset["val"]["images"])
+
+        self.setVocabs()
+
+        if config.dataset == "VQA" and config.ansFormat == "oe": # and (not config.ansAddUnk):
+            self.filterUnk(dataset["train"], "train", filterInstances = True)
+            self.filterUnk(dataset["val"], "val", filterInstances = False)
+            self.filterUnk(dataset["evalTrain"], "evalTrain", filterInstances = False)
+
         return dataset
 
     # Transform symbols to corresponding integers and vectorize into numpy array
     def vectorizeData(self, data):
-        # if "SHARED" tie symbol representations in questions and answers 
         if config.ansEmbMod == "SHARED":
-            qDict = self.qaDict
+            qDict, aDict = self.qaDict, self.qaDict
         else:
-            qDict = self.questionDict
+            qDict, aDict = self.questionDict, self.answerDict
+        oeAnswers = self.answerDict
 
-        encodedQuestions = [qDict.encodeSequence(d["questionSeq"]) for d in data]
+        encodedQuestions = [qDict.encodeSeq(d["question"]) for d in data]
         questions, questionsL = vectorize2DList(encodedQuestions)
 
-        answers = np.array([self.answerDict.encodeSym(d["answer"]) for d in data])
+        if config.ansFormat == "mc":
+            answers = np.array([d["answer"] for d in data])
+        else:
+            answers = np.array([oeAnswers.encodeSym(d["answer"]) for d in data])
         
-        # pass the whole instances? if heavy then not good
         imageIds = [d["imageId"] for d in data]
+
         indices = [d["index"] for d in data]
         instances = data
 
-        return {    "questions": questions,
-                    "questionLengths": questionsL,
-                    "answers": answers,
-                    "imageIds": imageIds,
-                    "indices": indices,
-                    "instances": instances
-                }
+        vectorizedData = {    
+            "questions": questions,
+            "questionLengths": questionsL,
+            "answers": answers,              
+            "imageIds": imageIds,
+            "indices": indices,
+            "instances": instances
+        }
+
+        if config.imageObjects:
+            vectorizedData["objectsNums"] = [d["objectsNum"] for d in data]
+
+        if config.dataset == "VQA":
+            encodedAnswerFreqs = [oeAnswers.encodeSeq(d["answerFreq"]) for d in data]
+            answerFreqs, answerFreqsN = vectorize2DList(encodedAnswerFreqs, minY = config.AnswerFreqMaxNum)
+
+            vectorizedData.update({                  
+                "answerFreqs": answerFreqs,
+                "answerFreqNums": answerFreqsN   
+            })
+
+            if config.ansFormat == "mc":
+                encodedChoices = [aDict.encodeSeq(d["choices"]) for d in data]
+                choices, choicesN = vectorize2DList(encodedChoices, minY = config.choicesMaxNum)
+
+                vectorizedData.update({                  
+                    "choices": choices,
+                    "choicesNums": choicesN  
+                })      
+
+        return vectorizedData
 
     # Separates data based on a field length
     def lseparator(self, key, lims):
@@ -450,21 +923,6 @@ class Preprocesser(object):
                     return i
             return maxI
         return {"separate": separatorFn, "groupsNum": maxI + 1}
-
-    # # separate data based on a field type
-    # def tseparator(self, key, types):
-    #     typesNum = len(types) + 1
-    #     def separatorFn(x):
-    #         v = str(x[key][-1])
-    #         return types.get(v, len(types))
-    #     return {"separate": separatorFn, "groupsNum": typesNum}
-
-    # # separate data based on field arity
-    # def bseparator(self, key):
-    #     def separatorFn(x):
-    #         cond = (len(x[key][-1]) == 2)
-    #         return (1 if cond else 0)
-    #     return {"separate": separatorFn, "groupsNum": 2}
 
     # Buckets data to groups using a separator
     def bucket(self, instances, separator):
@@ -489,11 +947,11 @@ class Preprocesser(object):
             if config.noBucket:
                 buckets = [data]
             elif config.noRebucket:
-                questionSep = self.lseparator("questionSeq", config.questionLims)
+                questionSep = self.lseparator("question", config.questionLims)
                 buckets = self.bucket(data, questionSep)
             else:
                 programSep = self.lseparator("programSeq", config.programLims)
-                questionSep = self.lseparator("questionSeq", config.questionLims)
+                questionSep = self.lseparator("question", config.questionLims)
                 buckets = self.bucket(data, programSep)
                 buckets = self.rebucket(buckets, questionSep)
         return buckets
@@ -514,8 +972,8 @@ class Preprocesser(object):
         filterVal = {"maxQLength": config.vMaxQ, "maxPLength": config.vMaxP,
                      "onlyChain": config.vOnlyChain, "filterOp": config.vFilterOp}
 
-        filters = {"train": filterTrain, "evalTrain": filterTrain, 
-                   "val": filterVal, "test": filterDefault}
+        filters = {"train": filterTrain, "evalTrain": filterTrain,
+            "val": filterVal, "test": filterDefault}
 
         if filterKey is None:
             fltr = filterDefault
@@ -534,24 +992,27 @@ class Preprocesser(object):
         if fltr["onlyChain"]:
             data = [d for d in data if all((len(inputNum) < 2) for inputNum in d["programInputs"])]
         if fltr["maxQLength"] > 0:
-            data = [d for d in data if len(d["questionSeq"]) <= fltr["maxQLength"]]
+            data = [d for d in data if len(d["question"]) <= fltr["maxQLength"]]
         if fltr["maxPLength"] > 0:
             data = [d for d in data if len(d["programSeq"]) <= fltr["maxPLength"]]
         if len(typeFilter) > 0:
             data = [d for d in data if d["programSeq"][-1] not in typeFilter]
 
-        # run on subset of the data. If 0 then use all data 
-        num = config.trainedNum if train else config.testedNum
-        # retainVal = True to retain same sample of validation across runs  
-        if (not train) and (not config.retainVal):
-            random.shuffle(data)
-        if num > 0:
-            data = data[:num]
-        # set number to match dataset size 
-        if train:
-            config.trainedNum = len(data)
+        if not train and config.testAll:
+            pass
         else:
-            config.testedNum = len(data)
+            # run on subset of the data. If 0 then use all data 
+            num = config.trainedNum if train else config.testedNum
+            # retainVal = True to retain same sample of validation across runs  
+            if (not train) and (not config.retainVal):
+                random.shuffle(data)
+            if num > 0:
+                data = data[:num]
+            # set number to match dataset size 
+            if train:
+                config.trainedNum = len(data)
+            else:
+                config.testedNum = len(data)
 
         # bucket
         buckets = self.bucketData(data, noBucket = noBucket)
@@ -576,48 +1037,130 @@ class Preprocesser(object):
         return dataset
 
     # Initializes word embeddings to random uniform / random normal / GloVe. 
-    def initializeWordEmbeddings(self, wordsDict = None, noPadding = False):
-        # default dictionary to use for embeddings
-        if wordsDict is None:
-            wordsDict = self.questionDict
-
+    def initEmbRandom(self, num, dim):
         # uniform initialization
         if config.wrdEmbUniform:
             lowInit = -1.0 * config.wrdEmbScale
             highInit = 1.0 * config.wrdEmbScale
             embeddings = np.random.uniform(low = lowInit, high = highInit, 
-                size = (wordsDict.getNumSymbols(), config.wrdEmbDim))
+                size = (num, dim))
         # normal initialization
         else:
-            embeddings = config.wrdEmbScale * np.random.randn(wordsDict.getNumSymbols(), 
-                config.wrdEmbDim)
+            embeddings = config.wrdEmbScale * np.random.randn(num, dim)
+        return embeddings
 
-        # if wrdEmbRandom = False, use GloVE
-        counter = 0
-        if (not config.wrdEmbRandom): 
-            with open(config.wordVectorsFile, 'r') as inFile:
-                for line in inFile:
-                    line = line.strip().split()
-                    word = line[0].lower()
-                    vector = [float(x) for x in line[1:]]
-                    index = wordsDict.sym2id.get(word)
-                    if index is not None:
-                        embeddings[index] = vector
-                        counter += 1
+    def sentenceEmb(self, sentence, wordVectors, dim):
+        words = sentence.split(" ")
+        wordEmbs = self.initEmbRandom(len(words), dim)
+        for idx, word in enumerate(words):
+            if word in wordVectors:
+                wordEmbs[idx] = wordVectors[word]
+        sentenceEmb = np.mean(wordEmbs, axis = 0)        
+        return sentenceEmb
+
+    def initializeWordEmbeddings(self, dim, wordsDict = None, random = False, name = ""):
+        # default dictionary to use for embeddings
+        if wordsDict is None:
+            wordsDict = self.questionDict
+
+        embsFile = config.dictNpyFile(name)
+        if config.npy and os.path.exists(embsFile):
+            embeddings = np.load(embsFile)
+            print("loaded embs from file")
+        else: 
+            embeddings = self.initEmbRandom(wordsDict.getNumSymbols(), dim)
+
+            # if wrdEmbRandom = False, use GloVE
+            counter = 0
+            if not random:
+                wordVectors = {}
+                with open(config.wordVectorsFile, "r") as inFile:
+                    for line in inFile:
+                        line = line.strip().split()
+                        word = line[0].lower()
+                        vector = np.array([float(x) for x in line[1:]])
+                        wordVectors[word] = vector
+
+                    for sym,idx in wordsDict.sym2id.items():
+                        if " " in sym:
+                            symEmb = self.sentenceEmb(sym, wordVectors, config.wrdAEmbDim)
+                            embeddings[idx] = symEmb
+                        else:
+                            if sym in wordVectors:
+                                embeddings[idx] = wordVectors[sym]
+                                counter += 1
+            
+            print(counter)
+            # print(self.questionDict.sym2id)
+            print("q", len(self.questionDict.sym2id))
+            # print(self.answerDict.sym2id)      
+            print("a", len(self.answerDict.sym2id))
+            # print(self.qaDict.sym2id)      
+            print(len(self.qaDict.sym2id))
         
-        print(counter)
-        print(self.questionDict.sym2id)
-        print(len(self.questionDict.sym2id))
-        print(self.answerDict.sym2id)      
-        print(len(self.answerDict.sym2id))
-        print(self.qaDict.sym2id)      
-        print(len(self.qaDict.sym2id))
+            with open("newqVocabFile.json", "w") as outFile:
+                json.dump(list(self.questionDict.sym2id.keys()), outFile)
 
-        if noPadding:            
-            return embeddings # no embedding for padding symbol
-        else:
-            return embeddings[1:]
+            with open("newaVocabFile.json", "w") as outFile:
+                json.dump(list(self.answerDict.sym2id.keys()), outFile)
 
+            if config.npy:
+                np.save(embsFile, embeddings)                               
+        
+        if wordsDict.padding in wordsDict.sym2id and wordsDict != self.answerDict: #?? padding for answers?
+            return embeddings[1:] # no embedding for padding symbol
+        return embeddings    
+
+    def initializeWordEmbeddingsList(self, dim, wordlist, random = False, name = ""):
+        embsFile = config.dictNpyFile(name)
+        if config.npy and os.path.exists(embsFile):
+            embeddings = np.load(embsFile)
+            print("loaded embs from file")
+        else: 
+            embeddings = self.initEmbRandom(len(wordlist), dim)
+
+            # if wrdEmbRandom = False, use GloVE
+            counter = 0
+            if not random:
+                wordVectors = {}
+                with open(config.wordVectorsSemanticFile, "r") as inFile:
+                    for line in inFile:
+                        line = line.strip().split()
+                        word = line[0].lower()
+                        vector = np.array([float(x) for x in line[1:]])
+                        wordVectors[word] = vector
+
+                    # answordavg
+                    for idx, sym in enumerate(wordlist):
+                        if " " in sym:
+                            symEmb = self.sentenceEmb(sym, wordVectors, dim)
+                            embeddings[idx] = symEmb
+                        else:
+                            if sym in wordVectors:
+                                embeddings[idx] = wordVectors[sym]
+                                counter += 1
+            
+            print(counter)
+        
+            if config.npy:
+                np.save(embsFile, embeddings)                               
+
+        return embeddings 
+
+    def initVocabs(self):
+        classes = ['__background__']  
+        with open(config.vocabFile("classes"), "r") as f:
+            for object in f.readlines():
+                classes.append(object.split(",")[0].lower().strip())
+        config.classesNum = len(classes)
+
+        attrs = ['__noAttr__']  
+        with open(config.vocabFile("attrs"), "r") as f:
+            for object in f.readlines():
+                attrs.append(object.split(",")[0].lower().strip())
+        config.attrsNum = len(attrs)
+
+        return classes, attrs
     '''
     Initializes words embeddings for question words and optionally for answer words
     (when config.ansEmbMod == "BOTH"). If config.ansEmbMod == "SHARED", tie embeddings for
@@ -626,16 +1169,20 @@ class Preprocesser(object):
     def initializeQAEmbeddings(self):
         # use same embeddings for questions and answers
         if config.ansEmbMod == "SHARED":
-            qaEmbeddings = self.initializeWordEmbeddings(self.qaDict)
-            ansMap = np.array([self.qaDict.sym2id[sym] for sym in self.answerDict.id2sym])
-            embeddings = {"qa": qaEmbeddings, "ansMap": ansMap}
+            qaEmbeddings = self.initializeWordEmbeddings(config.wrdQEmbDim, self.qaDict, 
+                random = config.wrdEmbQRandom, name = "qa")
+            oeAnswers = np.array([self.qaDict.sym2id[sym] for sym in self.answerDict.id2sym]) # [config.answerDelta:]
+            embeddings = {"qa": qaEmbeddings, "oeAnswers": oeAnswers}
         # use different embeddings for questions and answers
         else:
-            qEmbeddings = self.initializeWordEmbeddings(self.questionDict)
+            qEmbeddings = self.initializeWordEmbeddings(config.wrdQEmbDim, self.questionDict, 
+                random = config.wrdEmbQRandom, name = "q")
             aEmbeddings = None
             if config.ansEmbMod == "BOTH":
-                aEmbeddings = self.initializeWordEmbeddings(self.answerDict, noPadding = True)
-            embeddings = {"q": qEmbeddings, "a": aEmbeddings}
+                aEmbeddings = self.initializeWordEmbeddings(config.wrdAEmbDim, self.answerDict, 
+                    random = config.wrdEmbARandom, name = "a")
+            embeddings = {"q": qEmbeddings, "a": aEmbeddings} # mask
+
         return embeddings
 
     '''
@@ -648,10 +1195,13 @@ class Preprocesser(object):
     5. Buckets the data according to the instances length.
     '''
     def preprocessData(self, debug = False):
+        config.AnswerFreqMaxNum = 10
+        config.choicesMaxNum = 18 # read it from json "num_choices"
+
         # Read data into json and symbols' dictionaries
         print(bold("Loading data..."))
         start = time.time()
-        mainDataset = self.readDataset(hasTrain = True)
+        mainDataset = self.readDataset(hasTrain = True, trainOnVal = config.trainOnVal)
 
         extraDataset = None
         if config.extra:
@@ -659,7 +1209,7 @@ class Preprocesser(object):
             extraDataset = self.readDataset(suffix = "H", hasTrain = (not config.extraVal))          
             # extra dataset uses the same images
             if not config.extraVal:
-                for tier in extraDataset:
+                for tier in extraData:
                     extraDataset[tier]["images"] = mainDataset[tier]["images"]
 
         print("took {:.2f} seconds".format(time.time() - start))
@@ -676,13 +1226,16 @@ class Preprocesser(object):
 
         mainDataset = self.prepareDataset(mainDataset)
         # don't bucket for alternated data and also for humans data (small dataset)
+        # TODO: change not extraVal to a flag?
         extraDataset = self.prepareDataset(extraDataset, 
             noBucket = (not config.extraVal) or (not config.alterExtra))
 
         data = {"main": mainDataset, "extra": extraDataset}
         print("took {:.2f} seconds".format(time.time() - start))
 
-        config.questionWordsNum = self.questionDict.getNumSymbols()
-        config.answerWordsNum = self.answerDict.getNumSymbols()
-        
-        return data, embeddings, self.answerDict
+        # config.questionWordsNum = self.questionDict.getNumSymbols()
+        # config.answerDelta = 4
+        config.answerWordsNum = self.answerDict.getNumSymbols() # - config.answerDelta
+        print("answerWordsNum")
+        print(config.answerWordsNum)
+        return data, embeddings, self.answerDict, self.questionDict

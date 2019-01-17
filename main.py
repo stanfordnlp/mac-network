@@ -2,21 +2,25 @@ from __future__ import division
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", message="size changed")
+
 import sys 
+is_py2 = sys.version[0] == '2'
+if is_py2:
+    import Queue as queue
+else:
+    import queue as queue
+
+from collections import defaultdict
+from termcolor import colored, cprint
+import tensorflow as tf
+import numpy as np
+import threading
+import random
 import os
 import time
 import math
-import random
-try:
-    import Queue as queue
-except ImportError:
-    import queue
-import threading
 import h5py
 import json
-import numpy as np
-import tensorflow as tf
-from termcolor import colored, cprint
 
 from config import config, loadDatasetConfig, parseArgs
 from preprocess import Preprocesser, bold, bcolored, writeline, writelist
@@ -45,10 +49,10 @@ def logRecord(epoch, epochTime, lr, trainRes, evalRes, extraEvalRes):
     with open(config.logFile(), "a+") as outFile:
         record = [epoch, trainRes["acc"], evalRes["val"]["acc"], trainRes["loss"], evalRes["val"]["loss"]]
         if config.evalTrain:
-            record += [evalRes["evalTrain"]["acc"], evalRes["evalTrain"]["loss"]]
+            record += [evalRes["train"]["acc"], evalRes["train"]["loss"]]
         if config.extra:
             if config.evalTrain:
-                record += [extraEvalRes["evalTrain"]["acc"], extraEvalRes["evalTrain"]["loss"]]
+                record += [extraEvalRes["train"]["acc"], extraEvalRes["train"]["loss"]]
             record += [extraEvalRes["val"]["acc"], extraEvalRes["val"]["loss"]]
         record += [epochTime, lr]
 
@@ -69,7 +73,9 @@ analysisQuestionLims = [(0,18),(19,float("inf"))]
 analysisProgramLims = [(0,12),(13,float("inf"))]
 
 toArity = lambda instance: instance["programSeq"][-1].split("_", 1)[0]
-toType = lambda instance: instance["programSeq"][-1].split("_", 1)[1]
+toType = lambda instance: "boolean" if (instance["answer"] in ["yes", "no"]) else "open"
+toQType = lambda instance: instance["questionType"]
+toAType = lambda instance: instance["answerType"]
 
 def fieldLenIsInRange(field):
     return lambda instance, group: \
@@ -81,7 +87,7 @@ def grouperKey(toKey):
     def grouper(instances):
         res = defaultdict(list)
         for instance in instances:
-            res[toKey(instnace)].append(instance)
+            res[toKey(instance)].append(instance)
         return res
     return grouper
 
@@ -95,17 +101,19 @@ def grouperCond(groups, isIn):
     return grouper 
 
 groupers = {
-    "questionLength": grouperCond(analysisQuestionLims, fieldLenIsInRange("questionSeq")),
+    "questionLength": grouperCond(analysisQuestionLims, fieldLenIsInRange("question")),
     "programLength": grouperCond(analysisProgramLims, fieldLenIsInRange("programSeq")),
     "arity": grouperKey(toArity),
-    "type": grouperKey(toType)
+    "type": grouperKey(toType),
+    "qType": grouperKey(toQType),
+    "aType": grouperKey(toAType)
 }
 
 # Computes average
 def avg(instances, field):
     if len(instances) == 0:
         return 0.0
-    return sum(instances[field]) / len(instances)
+    return sum([(1 if instance["prediction"] == instance["answer"] else 0) for instance in instances]) / len(instances)
 
 # Prints analysis of questions loss and accuracy by their group 
 def printAnalysis(res):
@@ -114,38 +122,46 @@ def printAnalysis(res):
         groups = groupers[config.analysisType](res["preds"])
         for key in groups:
             instances = groups[key]
-            avgLoss = avg(instances, "loss")
+            # avgLoss = avg(instances, "loss") avgLoss
             avgAcc = avg(instances, "acc")
             num = len(instances)
-            print("Group {key}: Loss: {loss}, Acc: {acc}, Num: {num}".format(key, avgLoss, avgAcc, num))
+            print("Group {key}: Loss: {loss}, Acc: {acc}, Num: {num}".format(key = key, loss = 0, acc = avgAcc, num = num))
 
 # Print results for a tier
 def printTierResults(tierName, res, color):
     if res is None:
         return
 
-    print("{tierName} Loss: {loss}, {tierName} accuracy: {acc}".format(tierName = tierName,
+    print("{tierName} Loss: {loss}, {tierName} accuracy: {acc}, minLoss: {minLoss}, maxAcc: {maxAcc}".format(tierName = tierName,
         loss = bcolored(res["loss"], color), 
-        acc = bcolored(res["acc"], color)))
+        acc = bcolored(res["acc"], color),
+        minLoss = bcolored(res["minLoss"], color),
+        maxAcc = bcolored(res["maxAcc"], color)))
     
     printAnalysis(res)
 
 # Prints dataset results (for several tiers)
 def printDatasetResults(trainRes, evalRes, extraEvalRes):
     printTierResults("Training", trainRes, "magenta")
-    printTierResults("Training EMA", evalRes["evalTrain"], "red")
+    printTierResults("Training EMA", evalRes["train"], "red")
     printTierResults("Validation", evalRes["val"], "cyan")
-    printTierResults("Extra Training EMA", extraEvalRes["evalTrain"], "red")
+    printTierResults("Extra Training EMA", extraEvalRes["train"], "red")
     printTierResults("Extra Validation", extraEvalRes["val"], "cyan")    
 
 # Writes predictions for several tiers
 def writePreds(preprocessor, evalRes, extraEvalRes):
-    preprocessor.writePreds(evalRes["evalTrain"], "evalTrain")
+    preprocessor.writePreds(evalRes["train"], "train")
     preprocessor.writePreds(evalRes["val"], "val")
     preprocessor.writePreds(evalRes["test"], "test")
-    preprocessor.writePreds(extraEvalRes["evalTrain"], "evalTrain", "H")
+    preprocessor.writePreds(extraEvalRes["train"], "train", "H")
     preprocessor.writePreds(extraEvalRes["val"], "val", "H")
     preprocessor.writePreds(extraEvalRes["test"], "test", "H")
+
+def inp(msg):
+    if sys.version_info[0] < 3:
+        return raw_input(msg)
+    else:
+        return input(msg)
 
 ############################################# session #############################################
 # Initializes TF session. Sets GPU memory configuration.
@@ -218,19 +234,26 @@ def chooseTrainingData(data):
 
 #### evaluation
 # Runs evaluation on train / val / test datasets.
-def runEvaluation(sess, model, data, epoch, evalTrain = True, evalTest = False, getAtt = None):
+def runEvaluation(sess, model, data, dataOps, epoch, evalTrain = True, evalTest = False, 
+    getPreds = False, getAtt = None, prevRes = None):
     if getAtt is None:
         getAtt = config.getAtt
-    res = {"evalTrain": None, "val": None, "test": None}
+    res = {"train": None, "val": None, "test": None}
     
     if data is not None:
         if evalTrain and config.evalTrain:
-            res["evalTrain"] = runEpoch(sess, model, data["evalTrain"], train = False, epoch = epoch, getAtt = getAtt)
+            res["train"] = runEpoch(sess, model, data["evalTrain"], dataOps, train = False, epoch = epoch, getPreds = getPreds, getAtt = getAtt, 
+                maxAcc = prevRes["train"]["maxAcc"] if prevRes else 0.0,
+                minLoss = prevRes["train"]["minLoss"] if prevRes else float("inf"))
 
-        res["val"] = runEpoch(sess, model, data["val"], train = False, epoch = epoch, getAtt = getAtt)
+        res["val"] = runEpoch(sess, model, data["val"], dataOps, train = False, epoch = epoch, getPreds = getPreds, getAtt = getAtt, 
+            maxAcc = prevRes["val"]["maxAcc"] if prevRes else 0.0,
+            minLoss = prevRes["val"]["minLoss"] if prevRes else float("inf"))
         
         if evalTest or config.test:
-            res["test"] = runEpoch(sess, model, data["test"], train = False, epoch = epoch, getAtt = getAtt)    
+            res["test"] = runEpoch(sess, model, data["test"], dataOps, train = False, epoch = epoch, getPreds = getPreds, getAtt = getAtt, 
+                maxAcc = prevRes["test"]["maxAcc"] if prevRes else 0.0,
+                minLoss = prevRes["test"]["minLoss"] if prevRes else float("inf"))    
         
     return res
 
@@ -246,11 +269,16 @@ def improveEnough(curr, prior, lr):
     currTrainLoss = currRes["train"]["loss"]
     lossDiff = prevTrainLoss - currTrainLoss
     
-    notImprove = ((lossDiff < 0.015 and prevTrainLoss < 0.5 and lr > 0.00002) or \
-                  (lossDiff < 0.008 and prevTrainLoss < 0.15 and lr > 0.00001) or \
-                  (lossDiff < 0.003 and prevTrainLoss < 0.10 and lr > 0.000005))
-                  #(prevTrainLoss < 0.2 and config.lr > 0.000015)
-    
+    ## FOR CLEVR
+    if config.dataset == "CLEVR":
+        notImprove = ((lossDiff < 0.015 and prevTrainLoss < 0.5 and lr > 0.00002) or \
+                      (lossDiff < 0.008 and prevTrainLoss < 0.15 and lr > 0.00001) or \
+                      (lossDiff < 0.003 and prevTrainLoss < 0.10 and lr > 0.000005))
+                      #(prevTrainLoss < 0.2 and config.lr > 0.000015)
+    else:
+        notImprove = (lossDiff < 0.02 and lr > 0.00005)
+                      #(prevTrainLoss < 0.2 and config.lr > 0.000015)
+
     return not notImprove
 
 def better(currRes, bestRes):
@@ -270,7 +298,7 @@ def trimData(data):
 
 # Gets batch / bucket size.
 def getLength(data):
-    return len(data["instances"])
+    return len(data["indices"]) # len(data["instances"])
 
 # Selects the data entries that match the indices. 
 def selectIndices(data, indices):
@@ -310,27 +338,39 @@ def getBatches(data, batchSize = None, shuffle = True):
 #### image batches
 # Opens image files.
 def openImageFiles(images):
-    images["imagesFile"] = h5py.File(images["imagesFilename"], "r")
-    images["imagesIds"] = None
-    if config.dataset == "NLVR":
-        with open(images["imageIdsFilename"], "r") as imageIdsFile:
-            images["imagesIds"] = json.load(imageIdsFile)  
+    for group in images:
+        images[group]["imagesFile"] = h5py.File(images[group]["imagesFilename"], "r")
+        if config.dataset != "CLEVR":
+            with open(images[group]["imgsInfoFilename"], "r") as file:
+                images[group]["imgsInfo"] = json.load(file) 
 
 # Closes image files.
 def closeImageFiles(images): 
-    images["imagesFile"].close()
+    for group in images:
+        images[group]["imagesFile"].close()
 
 # Loads an images from file for a given data batch.
 def loadImageBatch(images, batch):
-    imagesFile = images["imagesFile"]
-    id2idx = images["imagesIds"]
+    imagesGroup = lambda imageId: images[imageId["group"]]
+    toFile = lambda imageId: imagesGroup(imageId)["imagesFile"]
+    toInfo = lambda imageId: imagesGroup(imageId)["imgsInfo"][str(imageId["id"])]
 
-    toIndex = lambda imageId: imageId
-    if id2idx is not None:
-        toIndex = lambda imageId: id2idx[imageId]
-    imageBatch = np.stack([imagesFile["features"][toIndex(imageId)] for imageId in batch["imageIds"]], axis = 0)
+    if config.imageObjects:
+        imageBatch = np.zeros((len(batch["imageIds"]), config.imageDims[0], config.imageDims[1]))
+        for i, imageId in enumerate(batch["imageIds"]):
+            numObjects = toInfo(imageId)["objectsNum"]
+
+            imageBatch[i, 0:numObjects] = toFile(imageId)["features-1"][imageId["idx"], 0:numObjects]
+
+    else:
+        imageBatch = np.stack([toFile(imageId)["features"][imageId["idx"]]     
+            for imageId in batch["imageIds"]], axis = 0)
+
+        config.imageDims = imageBatch.shape[1:]
     
-    return {"images": imageBatch, "imageIds": batch["imageIds"]}
+    ret = {"images": imageBatch, "imageIds": batch["imageIds"]}
+    
+    return ret 
 
 # Loads images for several num batches in the batches list from start index. 
 def loadImageBatches(images, batches, start, num):
@@ -362,7 +402,6 @@ def alternateData(batches, alterData, dataLen):
     curr = len(batches) - 1
     for alterBatch in alterBatches:
         if curr < 0:
-            # print(colored("too many" + str(curr) + " " + str(len(batches)),"red"))
             break
         batches.insert(curr, alterBatch)
         dataLen += getLength(alterBatch)
@@ -376,71 +415,14 @@ imagesQueue = queue.Queue(maxsize = 20) # config.tasksNum
 inQueue = queue.Queue(maxsize = 1)
 outQueue = queue.Queue(maxsize = 1)
 
-# Runs a worker thread(s) to load images while training .
-class StoppableThread(threading.Thread):
-    # Thread class with a stop() method. The thread itself has to check
-    # regularly for the stopped() condition.
-
-    def __init__(self, images, batches): # i
-        super(StoppableThread, self).__init__()
-        # self.i = i
-        self.images = images
-        self.batches = batches
-        self._stop_event = threading.Event()
-
-    # def __init__(self, args):
-    #     super(StoppableThread, self).__init__(args = args)
-    #     self._stop_event = threading.Event()
-
-    # def __init__(self, target, args):
-    #     super(StoppableThread, self).__init__(target = target, args = args)
-    #     self._stop_event = threading.Event()
-
-    def stop(self):
-        self._stop_event.set()
-
-    def stopped(self):
-        return self._stop_event.is_set()
-
-    def run(self):
-        while not self.stopped():
-            try:
-                batchNum = inQueue.get(timeout = 60)
-                nextItem = loadImageBatches(self.images, self.batches, batchNum, int(config.taskSize / 2))
-                outQueue.put(nextItem)
-                # inQueue.task_done()
-            except:
-                pass
-        # print("worker %d done", self.i)
-
 def loaderRun(images, batches):
     batchNum = 0
 
-    # if config.workers == 2:           
-    #     worker = StoppableThread(images, batches) # i, 
-    #     worker.daemon = True
-    #     worker.start() 
-
-    #     while batchNum < len(batches):
-    #         inQueue.put(batchNum + int(config.taskSize / 2))
-    #         nextItem1 = loadImageBatches(images, batches, batchNum, int(config.taskSize / 2))
-    #         nextItem2 = outQueue.get()
-
-    #         nextItem = nextItem1 + nextItem2
-    #         assert len(nextItem) == min(config.taskSize, len(batches) - batchNum)
-    #         batchNum += config.taskSize
-            
-    #         imagesQueue.put(nextItem)
-
-    #     worker.stop()
-    # else:
     while batchNum < len(batches):
         nextItem = loadImageBatches(images, batches, batchNum, config.taskSize)
         assert len(nextItem) == min(config.taskSize, len(batches) - batchNum)
         batchNum += config.taskSize                    
         imagesQueue.put(nextItem)
-
-    # print("manager loader done")
 
 ########################################## stats tracking #########################################
 # Computes exponential moving average.
@@ -457,6 +439,7 @@ def initStats():
         "totalData": 0,
         "totalLoss": 0.0,
         "totalCorrect": 0,
+        "totalAcc": 0.0,
         "loss": 0.0,
         "acc": 0.0,
         "emaLoss": None,
@@ -464,22 +447,22 @@ def initStats():
     }
 
 # Updates statistics with training results of a batch
-def updateStats(stats, res, batch):
+def updateStats(stats, res): 
     stats["totalBatches"] += 1
-    stats["totalData"] += getLength(batch)
+    stats["totalData"] += res["batchSize"]
 
     stats["totalLoss"] += res["loss"]
     stats["totalCorrect"] += res["correctNum"]
+    stats["totalAcc"] += res["acc"]
 
     stats["loss"] = stats["totalLoss"] / stats["totalBatches"]
     stats["acc"] = stats["totalCorrect"] / stats["totalData"]
     
     stats["emaLoss"] = emaAvg(stats["emaLoss"], res["loss"])
     stats["emaAcc"] = emaAvg(stats["emaAcc"], res["acc"])
-                                                    
+
     return stats 
 
-# auto-encoder ae = {:2.4f} autoEncLoss,
 # Translates training statistics into a string to print
 def statsToStr(stats, res, epoch, batchNum, dataLen, startTime):
     formatStr = "\reb {epoch},{batchNum} ({dataProcessed} / {dataLen:5d}), " + \
@@ -487,7 +470,7 @@ def statsToStr(stats, res, epoch, batchNum, dataLen, startTime):
                              "lr {lr}, l = {loss}, a = {acc}, avL = {avgLoss}, " + \
                              "avA = {avgAcc}, g = {gradNorm:2.4f}, " + \
                              "emL = {emaLoss:2.4f}, emA = {emaAcc:2.4f}; " + \
-                             "{expname}" # {machine}/{gpu}"
+                             "{expname}"
 
     s_epoch = bcolored("{:2d}".format(epoch),"green")
     s_batchNum = "{:3d}".format(batchNum)
@@ -505,17 +488,13 @@ def statsToStr(stats, res, epoch, batchNum, dataLen, startTime):
     s_emaLoss = stats["emaLoss"]
     s_emaAcc = stats["emaAcc"]
     s_expname = config.expName 
-    # s_machine = bcolored(config.dataPath[9:11],"green") 
-    # s_gpu = bcolored(config.gpus,"green")
 
     return formatStr.format(epoch = s_epoch, batchNum = s_batchNum, dataProcessed = s_dataProcessed,
                             dataLen = s_dataLen, time = s_time, loadTime = s_loadTime,
                             trainTime = s_trainTime, lr = s_lr, loss = s_loss, acc = s_acc,
                             avgLoss = s_avgLoss, avgAcc = s_avgAcc, gradNorm = s_gradNorm,
                             emaLoss = s_emaLoss, emaAcc = s_emaAcc, expname = s_expname)
-                            # machine = s_machine, gpu = s_gpu)
 
-# collectRuntimeStats, writer = None,  
 '''
 Runs an epoch with model and session over the data.
 1. Batches the data and optionally mix it with the extra alterData.
@@ -541,10 +520,17 @@ Args:
     alterData: extra data to mix with main data while training.
 
     getAtt: True to return model attentions.  
-'''
-def runEpoch(sess, model, data, train, epoch, saver = None, calle = None, 
-    alterData = None, getAtt = False):
-    # train = data["train"] better than outside argument
+'''    
+def runEpoch(sess, model, data, dataOps, train, epoch, saver = None, calle = None, 
+    alterData = None, getPreds = False, getAtt = False, maxAcc = 0.0, minLoss = float("Inf")):
+    dataLen = sum(getLength(bucket) for bucket in data["data"])
+    if dataLen == 0:
+        return {"loss": 0, 
+            "acc": 0,
+            "maxAcc": 0,
+            "minLoss": 0,
+            "preds": []
+            }
 
     # initialization
     startTime0 = time.time()
@@ -569,65 +555,59 @@ def runEpoch(sess, model, data, train, epoch, saver = None, calle = None,
     if train and alterData is not None:
         batches, dataLen = alternateData(batches, alterData, dataLen)
 
-    # start image loaders
-    if config.parallel:
-        loader = threading.Thread(target = loaderRun, args = (data["images"], batches))
-        loader.daemon = True
-        loader.start()
+    # for batchNum, batch in enumerate(batches):  
+    batchNum = 0
+    batchesNum = len(batches) 
 
-    for batchNum, batch in enumerate(batches):   
-        startTime = time.time()
+    while batchNum < batchesNum:
+        try:
+            startTime = time.time()
 
-        # prepare batch 
-        batch = trimData(batch)
+            # prepare batch 
+            batch = batches[batchNum]
+            batch = trimData(batch)
 
-        # load images batch
-        if config.parallel:
-            if batchNum % config.taskSize == 0:
-                imagesBatches = imagesQueue.get()
-            imagesBatch = imagesBatches[batchNum % config.taskSize] # len(imagesBatches)     
-        else:
+            # load images batch
             imagesBatch = loadImageBatch(data["images"], batch)
-        for i, imageId in enumerate(batch["imageIds"]):
-            assert imageId == imagesBatch["imageIds"][i]   
-        
-        # run batch
-        res = model.runBatch(sess, batch, imagesBatch, train, getAtt) 
+            for i, imageId in enumerate(batch["imageIds"]):
+                assert imageId == imagesBatch["imageIds"][i]   
+            
+            # run batch
+            res = model.runBatch(sess, batch, imagesBatch, train, getPreds, getAtt)
 
-        # update stats
-        stats = updateStats(stats, res, batch)
-        preds += res["preds"]
+            # update stats
+            stats = updateStats(stats, res) # , batch
+            preds += res["preds"]
 
-        # if config.summerize and writer is not None:
-        #     writer.add_summary(res["summary"], epoch)
+            sys.stdout.write(statsToStr(stats, res, epoch, batchNum, dataLen, startTime))
+            sys.stdout.flush()
 
-        sys.stdout.write(statsToStr(stats, res, epoch, batchNum, dataLen, startTime))
-        sys.stdout.flush()
+            # save weights
+            if saver is not None:
+                if batchNum > 0 and batchNum % config.saveEvery == 0:
+                    print("")
+                    print(bold("saving weights"))
+                    saver.save(sess, config.weightsFile(epoch))
 
-        # save weights
-        if saver is not None:
-            if batchNum > 0 and batchNum % config.saveEvery == 0:
-                print("")
-                print(bold("saving weights"))
-                saver.save(sess, config.weightsFile(epoch))
+            # calle
+            if calle is not None:            
+                if batchNum > 0 and batchNum % config.calleEvery == 0:
+                    calle()
 
-        # calle
-        if calle is not None:            
-            if batchNum > 0 and batchNum % config.calleEvery == 0:
-                calle()
-    
+            batchNum += 1
+
+        except tf.errors.OutOfRangeError:
+            break
+
     sys.stdout.write("\r")
     sys.stdout.flush()
 
-    print("")
-
     closeImageFiles(data["images"])
-
-    if config.parallel:
-        loader.join() # should work
 
     return {"loss": stats["loss"], 
             "acc": stats["acc"],
+            "maxAcc": max(stats["acc"], maxAcc),
+            "minLoss": min(stats["loss"], minLoss),
             "preds": preds
             }
 
@@ -662,13 +642,16 @@ def main():
     print(bold("Preprocess data..."))
     start = time.time()
     preprocessor = Preprocesser()
-    data, embeddings, answerDict = preprocessor.preprocessData()
+    data, embeddings, answerDict, questionDict = preprocessor.preprocessData()
     print("took {} seconds".format(bcolored("{:.2f}".format(time.time() - start), "blue")))
+
+    nextElement = None
+    dataOps = None
 
     # build model
     print(bold("Building model..."))
     start = time.time()
-    model = MACnet(embeddings, answerDict)
+    model = MACnet(embeddings, answerDict, questionDict, nextElement)
     print("took {} seconds".format(bcolored("{:.2f}".format(time.time() - start), "blue")))
 
     # initializer
@@ -689,10 +672,12 @@ def main():
         # restore / initialize weights, initialize epoch variable
         epoch = loadWeights(sess, saver, init)
 
+        trainRes, evalRes = None, None
+
         if config.train:
             start0 = time.time()
 
-            bestEpoch = epoch 
+            bestEpoch = epoch
             bestRes = None
             prevRes = None
 
@@ -704,8 +689,10 @@ def main():
                 # train
                 # calle = lambda: model.runEpoch(), collectRuntimeStats, writer
                 trainingData, alterData = chooseTrainingData(data)
-                trainRes = runEpoch(sess, model, trainingData, train = True, epoch = epoch, 
-                    saver = saver, alterData = alterData)
+                trainRes = runEpoch(sess, model, trainingData, dataOps, train = True, epoch = epoch, 
+                    saver = saver, alterData = alterData, 
+                    maxAcc = trainRes["maxAcc"] if trainRes else 0.0,
+                    minLoss = trainRes["minLoss"] if trainRes else float("inf"),)
                 
                 # save weights
                 saver.save(sess, config.weightsFile(epoch))
@@ -717,10 +704,12 @@ def main():
                     print(bold("Restoring EMA weights"))
                     emaSaver.restore(sess, config.weightsFile(epoch))
 
-                # evaluation                
-                evalRes = runEvaluation(sess, model, data["main"], epoch)
-                extraEvalRes = runEvaluation(sess, model, data["extra"], epoch, 
-                    evalTrain = not config.extraVal)
+                # evaluation  
+                getPreds = config.getPreds or (config.analysisType != "")
+
+                evalRes = runEvaluation(sess, model, data["main"], dataOps, epoch, getPreds = getPreds, prevRes = evalRes)
+                extraEvalRes = runEvaluation(sess, model, data["extra"], dataOps, epoch, 
+                    evalTrain = not config.extraVal, getPreds = getPreds)
 
                 # restore standard weights
                 if config.useEMA:
@@ -783,15 +772,73 @@ def main():
                 else:
                     saver.restore(sess, config.weightsFile(epoch))
 
-            evalRes = runEvaluation(sess, model, data["main"], epoch, evalTest = True)
-            extraEvalRes = runEvaluation(sess, model, data["extra"], epoch, 
-                evalTrain = not config.extraVal, evalTest = True)
+            evalRes = runEvaluation(sess, model, data["main"], dataOps, epoch, evalTest = False, getPreds = True)
+            extraEvalRes = runEvaluation(sess, model, data["extra"], dataOps, epoch, 
+                evalTrain = not config.extraVal, evalTest = False, getPreds = True)
                         
             print("took {:.2f} seconds".format(time.time() - start))
-            printDatasetResults(None, evalRes, extraEvalRes)
+            printDatasetResults(trainRes, evalRes, extraEvalRes)
 
             print("Writing predictions...")
             writePreds(preprocessor, evalRes, extraEvalRes)
+
+        if config.interactive:
+            if epoch > 0:
+                if config.useEMA:
+                    emaSaver.restore(sess, config.weightsFile(epoch))
+                else:
+                    saver.restore(sess, config.weightsFile(epoch))
+
+            tier = config.interactiveTier
+            images = data["main"][tier]["images"]
+
+            imgsInfoFilename = config.imgsInfoFile(tier)
+            with open(imgsInfoFilename, "r") as file:
+                imageIndex = json.load(file)  
+
+            openImageFiles(images)
+
+            resInter = {"preds": []}
+
+            while True:
+
+                text = inp("Enter <imageId>_<question>\n")
+                if len(text) == 0:
+                    break
+                
+                imageId, questionStr = text.split("_")
+
+                imageInfo = imageIndex[imageId]
+
+                imageId = {"group": tier, "id": imageId, "idx": imageInfo["idx"]} # int(imageId)
+                question = preprocessor.encodeQuestionStr(questionStr)
+                instance = {
+                    "questionStr": questionStr,
+                    "question": question,
+                    "answer": "yes", # Dummy answer
+                    "answerFreq": ["yes"], # Dummy answer
+                    "imageId": imageId,
+                    "tier": tier,
+                    "index": 0 
+                }
+
+                if config.imageObjects:
+                    instance["objectsNum"] = imageInfo["objectsNum"]
+
+                print(instance)
+                
+                datum = preprocessor.vectorizeData([instance])
+                image = loadImageBatch(images, {"imageIds": [imageId]})
+                res = model.runBatch(sess, datum, image, train = False, getPreds = True, getAtt = True)
+                resInter["preds"].append(instance)
+
+                print(instance["prediction"])
+
+            if config.getPreds:
+                print(bcolored("Writing predictions...", "white"))
+                preprocessor.writePreds(resInter, "interactive".format())
+
+            closeImageFiles(images)
 
         print(bcolored("Done!","white"))
 

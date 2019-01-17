@@ -21,6 +21,7 @@ def getWeight(shape, name = ""):
         # if len(shape) == 1: # good?
         #     initializer = tf.random_normal_initializer()        
         W = tf.get_variable("weight" + name, shape = shape, initializer = initializer)
+        
     return W
 
 '''
@@ -46,7 +47,6 @@ def getBias(shape, name = ""):
 '''
 Multiplies input inp of any depth by a 2d weight matrix.  
 '''
-# switch with conv 1?
 def multiply(inp, W):
     inDim = tf.shape(W)[0]
     outDim = tf.shape(W)[1] 
@@ -62,8 +62,8 @@ def multiply(inp, W):
 Concatenates x and y. Support broadcasting. 
 Optionally concatenate multiplication of x * y
 '''
-def concat(x, y, dim, mul = False, extendY = False):
-    if extendY:
+def concat(x, y, dim, mul = False, expandY = False):
+    if expandY:
         y = tf.expand_dims(y, axis = -2)
         # broadcasting to have the same shape
         y = tf.zeros_like(x) + y
@@ -76,6 +76,11 @@ def concat(x, y, dim, mul = False, extendY = False):
         dim *= 2
     
     return out, dim
+
+def expand(x, y):
+    y = tf.expand_dims(y, axis = -2)
+    y = tf.zeros_like(x) + y
+    return y
 
 '''
 Adds L2 regularization for weight and kernel variables.
@@ -137,9 +142,11 @@ Args:
 Return attention distribution over interactions.
 [batchSize, N]
 '''
-def inter2att(interactions, dim, dropout = 1.0, name = "", reuse = None):
+def inter2att(interactions, dim, dropout = 1.0, mask = None, sumMod = "LIN", name = "", reuse = None):
     with tf.variable_scope("inter2att" + name, reuse = reuse): 
-        logits = inter2logits(interactions, dim, dropout = dropout)
+        logits = inter2logits(interactions, dim, dropout = dropout, sumMod = sumMod)
+        if mask is not None:
+            logits = expMask(logits, mask)
         attention = tf.nn.softmax(logits)    
     return attention
 
@@ -168,8 +175,8 @@ def relu(inp):
             output = pos + neg
     elif config.relu == "ELU":
         output = tf.nn.elu(inp)
-    # elif config.relu == "SELU":
-    #     output = tf.nn.selu(inp) 
+    elif config.relu == "SELU":
+        output = tf.nn.selu(inp) 
     elif config.relu == "LKY":
         # output = tf.nn.leaky_relu(inp, config.reluAlpha)
         output = tf.maximum(inp, config.reluAlpha * inp)
@@ -179,12 +186,12 @@ def relu(inp):
     return output
 
 activations = {
-    "NON":      tf.identity, # lambda inp: inp    
+    "NON":      tf.identity,    
     "TANH":     tf.tanh,
     "SIGMOID":  tf.sigmoid,
     "RELU":     relu,
     "ELU":      tf.nn.elu
-}    
+}
 
 # Sample from Gumbel(0, 1)
 def sampleGumbel(shape): 
@@ -242,7 +249,7 @@ Used to prepare logits before softmax.
 '''
 def expMask(seq, seqLength):
     maxLength = tf.shape(seq)[-1]
-    mask = (1 - tf.cast(tf.sequence_mask(seqLength, maxLength), tf.float32)) * (-inf)
+    mask = (tf.to_float(tf.logical_not(tf.sequence_mask(seqLength, maxLength)))) * (-inf)
     masked = seq + mask
     return masked
 
@@ -271,6 +278,13 @@ def seq2seqAcc(preds, targets, lengths):
     acc2 = tf.reduce_mean(acc2)      
 
     return acc1, acc2
+
+def hingeLoss(labels, logits):
+    maxLogit = tf.reduce_max(logits * (1 - labels), axis = 1, keepdims = True)  
+    losses = tf.nn.relu((1 + maxLogit - logits) * labels)
+    losses = tf.reduce_sum(losses, axis = 1) # reduce_max reduce sum will also work
+    return losses
+    #final_loss = tf.reduce_mean(tf.reduce_max(L, axis = 1))
 
 ########################################### linear ###########################################
 
@@ -420,6 +434,7 @@ Args:
 '''
 # batchNorm = {"decay": float, "train": Tensor, "center": bool, "scale": bool}
 # activation after last layer
+# TODO: use layers.cnn
 def CNNLayer(features, dims, batchNorm = None, dropout = 1.0, 
     kernelSizes = None, strides = None, act = "RELU"):
     
@@ -603,7 +618,7 @@ def linearizeFeatures(features, h, w, inDim, projDim = None, outDim = None,
             locType = loc["locType"], mod = loc["mod"])
 
     if projDim is not None:
-        features = linear(features, dim, projDim)
+        features = linear(features, inDim, projDim)
         features = relu(features)
         dim = projDim
 
@@ -614,7 +629,7 @@ def linearizeFeatures(features, h, w, inDim, projDim = None, outDim = None,
         h /= pooling
         w /= pooling
   
-    dim = h * w * dim  
+    dim = h * w * dim
     features = tf.reshape(features, (-1, dim))
     
     if outDim is not None:
@@ -666,7 +681,7 @@ Returns the multiplication result
 # interMod = ["MUL", "DIAG", "BL", "ADD"]
 # concat = {"x": bool, "y": bool, "proj": bool}
 def mul(x, y, dim, dropout = 1.0, proj = None, interMod = "MUL", concat = None, mulBias = None,
-    extendY = True, name = "", reuse = None):
+    expandY = True, name = "", reuse = None):
     
     with tf.variable_scope("mul" + name, reuse = reuse):                
         origVals = {"x": x, "y": y, "dim": dim}
@@ -691,7 +706,7 @@ def mul(x, y, dim, dropout = 1.0, proj = None, interMod = "MUL", concat = None, 
             projVals = {"x": x, "y": y, "dim": dim}
             proj["x"], proj["y"] = x, y
 
-        if extendY:
+        if expandY:
             y = tf.expand_dims(y, axis = -2)
             # broadcasting to have the same shape
             y = tf.zeros_like(x) + y
@@ -704,7 +719,7 @@ def mul(x, y, dim, dropout = 1.0, proj = None, interMod = "MUL", concat = None, 
         elif interMod == "DIAG":
             W = getWeight((dim, )) # change initialization?
             b = getBias((dim, ))
-            activations = x * W * y + b
+            output = x * W * y + b
         elif interMod == "BL":
             W = getWeight((dim, dim))
             b = getBias((dim, ))            
@@ -712,6 +727,7 @@ def mul(x, y, dim, dropout = 1.0, proj = None, interMod = "MUL", concat = None, 
         else: # "ADD"
             output = tf.tanh(x + y)
         # concatenation
+
         if concat is not None:
             concatVals = projVals if concat.get("proj", False) else origVals
             if concat.get("x", False):
@@ -719,7 +735,7 @@ def mul(x, y, dim, dropout = 1.0, proj = None, interMod = "MUL", concat = None, 
                 dim += concatVals["dim"]
 
             if concat.get("y", False):
-                output = ops.concat(output, concatVals["y"], extendY = extendY)
+                output = concat(output, concatVals["y"], expandY = expandY)
                 dim += concatVals["dim"]
 
     return output, dim
@@ -750,7 +766,7 @@ def createCell(hDim, reuse, cellType = None, act = None, projDim = None):
     if cellType is None:
         cellType = config.encType
 
-    activation = activations.get(act, None) 
+    activation = activations.get(act, None)
 
     if cellType == "ProjLSTM":
         cell = tf.nn.rnn_cell.LSTMCell
@@ -998,52 +1014,6 @@ def gridRNNLayer(features, h, w, dim, right, down, name = "", reuse = None):
         outputs = tf.stack(outputs, axis = 1)
 
     return outputs
-
-# tf seq2seq?
-# def projRNNLayer(inSeq, seqL, hDim, labels, labelsNum, labelsDim, labelsEmb, name = "", reuse = None):
-#     with tf.variable_scope("projRNNLayer" + name):
-#         batchSize = tf.shape(features)[0]
-
-#         cell = createCell(hDim, reuse = reuse)
-
-#         projCell = ProjWrapper(cell, labelsNum, labelsDim, labelsEmb, # config.wrdEmbDim
-#             feedPrev = True, dropout = 1.0, config,
-#             temperature = 1.0, sample = False, reuse)
-        
-#         initialState = projCell.zero_state(batchSize, tf.float32)
-        
-#         if config.soft:
-#             inSeq = inSeq
-
-#             # outputs, _ = tf.nn.static_rnn(projCell, inputs, 
-#             #     sequence_length = seqL, 
-#             #     initial_state = initialState)
-
-#             inSeq = tf.unstack(inSeq, axis = 1)                        
-#             state = initialState
-#             logitsList = []
-#             chosenList = []
-
-#             for inp in inSeq:
-#                 (logits, chosen), state = projCell(inp, state)
-#                 logitsList.append(logits)
-#                 chosenList.append(chosen)
-#                 projCell.reuse = True
-
-#             logitsOut = tf.stack(logitsList, axis = 1)
-#             chosenOut = tf.stack(chosenList, axis = 1)
-#             outputs = (logitsOut, chosenOut)
-#         else:
-#             labels = tf.to_float(labels)
-#             labels = tf.concat([tf.zeros((batchSize, 1)), labels], axis = 1)[:, :-1] # ,newaxis
-#             inSeq = tf.concat([inSeq, tf.expand_dims(labels, axis = -1)], axis = -1)
-
-#             outputs, _ = tf.nn.dynamic_rnn(projCell, inSeq, 
-#                 sequence_length = seqL, 
-#                 initial_state = initialState,
-#                 swap_memory = True)
-
-#     return outputs #, labelsEmb
 
 ############################### variational dropout ###############################
 

@@ -3,7 +3,6 @@ import argparse
 
 ###################################### configuration ######################################
 class Config(object):
-
     typeFilters = [[], ["1_query_size_",
                 "1_query_material_",
                 "2_equal_color_",
@@ -20,17 +19,19 @@ class Config(object):
 
     # file names
     imagesFilename = "{tier}.h5" # Images
+    imgsInfoFilename = "{tier}_imgsInfo.json"
     instancesFilename = "{tier}Instances.json"
     # symbols dictionaries
-    questionDictFilename = "questionDict.pkl"
-    answerDictFilename = "answerDict.pkl"
-    qaDictFilename = "qaDict.pkl"
+    questionDictFilename = "questionVocab.pkl" # Dict
+    answerDictFilename = "answerVocab.pkl"
+    qaDictFilename = "qaVocab.pkl"
+    dictNpyFilename = "{name}Embs.npy"
     
     ## experiment files
     expPathname = "{expName}"
     expName = "" #  will be assigned through argparse
 
-    weightsPath = "./weights"
+    weightsPath = "./"
     weightsFilename = "weights{epoch}.ckpt"
 
     # model predictions and optionally attention maps
@@ -65,13 +66,19 @@ class Config(object):
         return self.dataFile(self.generatedPrefix + filename)
 
     datasetFile     = lambda self, tier: self.dataFile(self.datasetFilename.format(tier = tier))
-    imagesIdsFile   = lambda self, tier: self.dataFile(self.imgIdsFilename.format(tier = tier)) #
+    annotationsFile = lambda self, tier: self.dataFile(self.annotationsFilename.format(tier = tier))
+    pairsFile = lambda self, tier: self.dataFile(self.pairsFilename.format(tier = tier))
+
     imagesFile      = lambda self, tier: self.dataFile(self.imagesFilename.format(tier = tier))
+    imgsInfoFile    = lambda self, tier: self.dataFile(self.imgsInfoFilename.format(tier = tier))
+    vocabFile       = lambda self, type: self.dataFile(self.vocabFilename.format(type = type))
+
     instancesFile   = lambda self, tier: self.generatedFile(self.instancesFilename.format(tier = tier))
 
     questionDictFile    = lambda self: self.generatedFile(self.questionDictFilename)
     answerDictFile      = lambda self: self.generatedFile(self.answerDictFilename)
     qaDictFile          = lambda self: self.generatedFile(self.qaDictFilename)
+    dictNpyFile    = lambda self, name: self.generatedFile(self.dictNpyFilename.format(name = name))
 
     ## experiment files
     expPath     = lambda self: self.expPathname.format(expName = self.toString())
@@ -107,8 +114,7 @@ def parseArgs():
     parser.add_argument("--parallel",       action = "store_true",          help = "load images in parallel to batch running")
     parser.add_argument("--workers",        default = 1, type = int,        help = "number of workers to load images")
     parser.add_argument("--taskSize",       default = 8, type = int,        help = "number of image batches to load in advance") # 40
-    # parser.add_argument("--tasksNum",       default = 20, type = int,       help = "maximal queue size for tasks (to constrain ram usage)") # 2
-
+    parser.add_argument("--npy",      action = "store_true") 
     parser.add_argument("--useCPU",         action = "store_true",          help = "put word embeddings on cpu")
 
     # weight loading and training
@@ -122,35 +128,57 @@ def parseArgs():
     parser.add_argument("--trainSubset",    action = "store_true",          help = "train only subset of the weights")
     parser.add_argument("--varSubset",      default = [], nargs = "*",      type = str, help = "list of namespaces to train on")    
     
-    # trainReader = ["questionEmbeddings", "questionReader"]
-    # saveControl = ["questionEmbeddings", "programEmbeddings", "seqReader", "programControl"]
+    parser.add_argument("--subsetOpt",         action = "store_true") # VQA
+    parser.add_argument("--subsetOptMult",     default = 1.0, type = float) # VQA
     
     # experiment files
     parser.add_argument("--expName",        default = "experiment", type = str,    help = "experiment name") 
 
     # data files
-    parser.add_argument("--dataset",         default = "CLEVR", choices = ["CLEVR", "NLVR"], type = str) # 
-    parser.add_argument("--dataBasedir",     default = "./", type = str,            help = "data base directory") # /jagupard14/scr1/dorarad/
+    parser.add_argument("--dataset",         default = "CLEVR", choices = ["CLEVR", "NLVR", "VQA", "GQA", "VG", "V7W"], type = str) # 
+    parser.add_argument("--dataBasedir",     default = "./", type = str,            help = "data base directory") 
+    parser.add_argument("--subdir",          default = "./", type = str,            help = "data base directory") 
     parser.add_argument("--generatedPrefix", default = "gen", type = str,           help = "prefix for generated data files") 
-    parser.add_argument("--featureType",     default = "norm_128x32", type = str,   help = "features type") #   
-    # resnet101_512x128, norm_400x100, none_80x20, normPerImage_80x20, norm_80x20
+    parser.add_argument("--valFilenames",    default = [], nargs = "*", type = str) 
+    parser.add_argument("--featureType",     default = "resnet", type = str,   help = "features type")
     
+    parser.add_argument("--imageDims",    default = [100, 2048], nargs = "*", type = int) # [14, 14, 2048]   
+    parser.add_argument("--imageObjects", action = "store_true")    
+
+    # FOR NLVR:
+    # parser.add_argument("--featureType",     default = "norm_128x32", type = str,   help = "features type") #   
+    # resnet101_512x128, norm_400x100, none_80x20, normPerImage_80x20, norm_80x20
+    parser.add_argument("--dataVer",         default = 2, type = int) # VQA
+    parser.add_argument("--dataSubset",      default = "samQuestions", type = str) # VQA
+    parser.add_argument("--ansFormat",       default = "oe", choices = ["oe", "mc"], type = str) # open-ended, multiple-choices # VQA
+    parser.add_argument("--ansTokenize",     action = "store_true") # VQA tokenize answer words into list
+    # if true, then prediction has to be sentence prediction, like in captioning (NOT SUPPORTED YET)
+    parser.add_argument("--ansWrdAvg",       action = "store_true") # VQA initialize answer as word average TRUE
+    parser.add_argument("--answerBias",       action = "store_true") # VQA initialize answer as word average TRUE
+    parser.add_argument("--tokenizer",      default = "non", choices = ["stanford", "nltk", "non"], type = str) # VQA initialize answer as word average TRUE
+
     ################ optimization
 
     # training/testing
     parser.add_argument("--train",          action = "store_true",      help = "run training")
     parser.add_argument("--evalTrain",      action = "store_true",      help = "run eval with ema on train dataset") #   
+    parser.add_argument("--trainOnVal",     action = "store_true") # VQA
     parser.add_argument("--test",           action = "store_true",      help = "run testing every epoch and generate predictions file") #
     parser.add_argument("--finalTest",      action = "store_true",      help = "run testing on final epoch")
     parser.add_argument("--retainVal",      action = "store_true",      help = "retain validation order between runs") #     
+    parser.add_argument("--interactive",     action = "store_true") # VQA interactive mode, over test
+    parser.add_argument("--interactiveTier", default = "val", choices = ["train", "val", "test"], type = str) # VQA interactive mode, over test
 
     parser.add_argument("--getPreds",       action = "store_true",      help = "store prediction")
     parser.add_argument("--getAtt",         action = "store_true",      help = "store attention maps")
-    parser.add_argument("--analysisType",   default = "", type = str,   choices = ["", "questionLength, programLength","type", "arity"], help = "show breakdown of results according to type") #
+    parser.add_argument("--analysisType",   default = "", type = str,   choices = ["", "questionLength, programLength","type", "arity", "qType", "aType"], help = "show breakdown of results according to type") #
 
     parser.add_argument("--trainedNum",     default = 0, type = int,    help = "if positive, train on subset of the data")    
     parser.add_argument("--testedNum",      default = 0, type = int,    help = "if positive, test on subset of the data")  
-    
+    parser.add_argument("--testAll",         action = "store_true",      help = "store attention maps")
+
+    parser.add_argument("--valSplit",      default = 0, type = int,    help = "if positive, test on subset of the data")  
+
     # bucketing
     parser.add_argument("--noBucket",       action = "store_true",      help = "bucket data according to question length")        
     parser.add_argument("--noRebucket",     action = "store_true",      help = "bucket data according to question and program length") #
@@ -178,9 +206,10 @@ def parseArgs():
     parser.add_argument("--emaDecayRate",   default = 0.999, type = float,   help = "decay rate for exponential moving average")
     
     # sgd optimizer
-    parser.add_argument("--batchSize",      default = 64, type = int,       help = "batch size")    
+    #print("batchSize 512") # 512
+    parser.add_argument("--batchSize",      default = 128, type = int,       help = "batch size")    
     parser.add_argument("--epochs",         default = 100, type = int,      help = "number of epochs to run")    
-    parser.add_argument("--lr",             default = 0.0001, type = float, help = "learning rate")
+    parser.add_argument("--lr",             default = 0.0003, type = float, help = "learning rate")
     parser.add_argument("--lrReduce",       action = "store_true",          help = "reduce learning rate if training loss doesn't go down (manual annealing)")    
     parser.add_argument("--lrDecayRate",    default = 0.5, type = float,    help = "learning decay rate if training loss doesn't go down")
     parser.add_argument("--earlyStopping",  default = 0, type = int,        help = "if positive, stop if no improvement for that number of epochs")
@@ -211,18 +240,21 @@ def parseArgs():
     parser.add_argument("--readDropout",    default = 0.85, type = float,    help = "dropout of the read unit")     
     parser.add_argument("--writeDropout",   default = 1.0, type = float,    help = "dropout of the write unit") 
     parser.add_argument("--outputDropout",  default = 0.85, type = float,   help = "dropout of the output unit") 
-    
+    parser.add_argument("--controlPreDropout",   default = 1.0, type = float,    help = "dropout of the write unit") 
+    parser.add_argument("--controlPostDropout",   default = 1.0, type = float,    help = "dropout of the write unit") 
+    parser.add_argument("--wordEmbDropout",   default = 1.0, type = float,    help = "dropout of the write unit") 
+
     parser.add_argument("--parametricDropout",        action = "store_true", help = "use parametric dropout") #
     parser.add_argument("--encVariationalDropout",    action = "store_true", help = "use variational dropout in the RNN input unit") 
     parser.add_argument("--memoryVariationalDropout", action = "store_true", help = "use variational dropout across the MAC network") 
 
     ## nonlinearities
     parser.add_argument("--relu",       default = "STD", choices = ["STD", "PRM", "ELU", "LKY", "SELU"], type = str, help = "type of ReLU to use: standard, parametric, ELU, or leaky")
-    # parser.add_argument("--reluAlpha",  default = 0.2, type = float,    help = "alpha value for the leaky ReLU")
+    parser.add_argument("--reluAlpha",  default = 0.2, type = float,    help = "alpha value for the leaky ReLU")
 
     parser.add_argument("--mulBias",    default = 0.0, type = float,   help = "bias to add in multiplications (x + b) * (y + b) for better training") #
 
-    parser.add_argument("--imageLinPool",   default = 2, type = int,   help = "pooling for image linearizion") 
+    parser.add_argument("--imageLinPool",   default = 1, type = int,   help = "pooling for image linearizion")  # 2
 
     ################ baseline model parameters
     
@@ -230,23 +262,35 @@ def parseArgs():
     parser.add_argument("--baselineLSTM",   action = "store_true",     help = "use LSTM in baseline")    
     parser.add_argument("--baselineCNN",    action = "store_true",     help = "use CNN in baseline")       
     parser.add_argument("--baselineAtt",    action = "store_true",     help = "use stacked attention baseline")
-    
+    parser.add_argument("--baselineNew",    action = "store_true") # VQA
+    parser.add_argument("--baselinePre", default = "CNCT", type = str, choices = ["CNCT", "ADD", "MUL"]) # VQA
+    parser.add_argument("--baselinePost", default = "MUL", type = str, choices = ["CNCT", "MUL"]) # VQA
+
     parser.add_argument("--baselineProjDim", default = 64, type = int, help = "projection dimension for image linearizion")    
 
     parser.add_argument("--baselineAttNumLayers", default = 2, type = int, help = "number of stacked attention layers") 
     parser.add_argument("--baselineAttType", default = "ADD", type = str, choices = ["MUL", "DIAG", "BL", "ADD"], help = "attention type (multiplicative, additive, etc)") 
 
-    ################ image input unit (the "stem")
+    parser.add_argument("--baselineActPre",                 default = "NON", type = str,   choices = ["NON", "RELU", "TANH"]) # VQA
+    parser.add_argument("--baselineActPost",                 default = "NON", type = str,   choices = ["NON", "RELU", "TANH"]) # VQA
+    parser.add_argument("--baselineGate",                action = "store_true") # VQA
+    parser.add_argument("--baselineTakePre",                action = "store_true") # VQA
+    parser.add_argument("--baselineExtraL",                action = "store_true") # VQA
 
+
+    ################ image input unit (the "stem")
+    parser.add_argument("--stemDims",      default = [512], nargs = "*",   type = int, help = "dimensions of the classifier") 
     parser.add_argument("--stemDim",         default = 512, type = int,               help = "dimension of stem CNNs") 
     parser.add_argument("--stemNumLayers",   default = 2, type = int,                 help = "number of stem layers")
     parser.add_argument("--stemKernelSize",  default = 3, type = int,                 help = "kernel size for stem (same for all the stem layers)")
     parser.add_argument("--stemKernelSizes", default = None, nargs = "*", type = int, help = "kernel sizes for stem (per layer)")
     parser.add_argument("--stemStrideSizes", default = None, nargs = "*", type = int, help = "stride sizes for stem (per layer)")
+    parser.add_argument("--stemNormalize",   action = "store_true") # VQA 
 
     parser.add_argument("--stemLinear",             action = "store_true",          help = "use a linear stem (instead of CNNs)") #
-    # parser.add_argument("--stemProjDim",          default = 64, type = int,       help = "projection dimension of in image linearization") #
-    # parser.add_argument("--stemProjPooling",      default = 2, type = int,        help = "pooling for the image linearization") #
+    parser.add_argument("--stemDp",                 action = "store_true",          help = "use a linear stem (instead of CNNs)") #
+    parser.add_argument("--stemDeep",               action = "store_true",          help = "use a linear stem (instead of CNNs)") #
+    parser.add_argument("--stemAct",                default = "NON", type = str,    choices = ["NON", "RELU", "TANH"], help = "nonlinearity type for grid") #
 
     parser.add_argument("--stemGridRnn",            action = "store_true",          help = "use grid RNN layer") #
     parser.add_argument("--stemGridRnnMod",         default = "RNN", type = str,    choices = ["RNN", "GRU"], help = "RNN type for grid") #
@@ -263,22 +307,38 @@ def parseArgs():
     parser.add_argument("--encDim",                 default = 512, type = int,      help = "dimension of encoder RNN")    
     parser.add_argument("--encNumLayers",           default = 1, type = int,        help = "number of encoder RNN layers")  
     parser.add_argument("--encBi",                  action = "store_true",          help = "use bi-directional encoder")    
-    # parser.add_argument("--encOutProj",           action = "store_true",          help = "add projection layer for encoder outputs") 
-    # parser.add_argument("--encOutProjDim",        default = 256, type = int,      help = "dimension of the encoder projection layer") 
-    # parser.add_argument("--encQProj",             action = "store_true",          help = "add projection for the question representation")
     parser.add_argument("--encProj",                action = "store_true",          help = "project encoder outputs and question")
     parser.add_argument("--encProjQAct",            default = "NON", type = str,    choices = ["NON", "RELU", "TANH"], help = "project question vector with this activation")
 
     ##### word embeddings 
-    parser.add_argument("--wrdEmbDim",              default = 300, type = int,      help = "word embeddings dimension") 
-    parser.add_argument("--wrdEmbRandom",           action = "store_true",          help = "initialize word embeddings to random (normal)")
+    parser.add_argument("--semanticWordsEmbDim",  default = 300, type = int) # V    
+    parser.add_argument("--wrdQEmbDim",              default = 300, type = int,      help = "word embeddings dimension") 
+    parser.add_argument("--wrdAEmbDim",              default = 300, type = int,      help = "word embeddings dimension") 
+    parser.add_argument("--wrdEmbQRandom",           action = "store_true",          help = "initialize word embeddings to random (normal)") # VQA
+    parser.add_argument("--wrdEmbARandom",           action = "store_true",          help = "initialize word embeddings to random (normal)") # VQA
     parser.add_argument("--wrdEmbUniform",          action = "store_true",          help = "initialize with uniform distribution")
     parser.add_argument("--wrdEmbScale",            default = 1.0, type = float,    help = "word embeddings initialization scale")
-    parser.add_argument("--wrdEmbFixed",            action = "store_true",          help = "set word embeddings fixed (don't train)")
-    parser.add_argument("--wrdEmbUnknown",          action = "store_true",          help = "set words outside of training set to <UNK>")
+    parser.add_argument("--wrdEmbQFixed",            action = "store_true",          help = "set word embeddings fixed (don't train)") # VQA
+    parser.add_argument("--wrdEmbAFixed",            action = "store_true",          help = "set word embeddings fixed (don't train)") # VQA
 
+    parser.add_argument("--wrdEmbQUnk",              action = "store_true", help = "set words outside of training set to <UNK>") # VQA
+    parser.add_argument("--wrdEmbQMinCount",         default = 0, type = int) # VQA 4
+    parser.add_argument("--wrdEmbQTop",              default = 0, type = int) # VQA 0
+    
+    parser.add_argument("--wrdEmbAUnk",              action = "store_true", help = "set words outside of training set to <UNK>") # VQA
+    parser.add_argument("--wrdEmbAMinCount",         default = 0, type = int) # VQA 10
+    parser.add_argument("--wrdEmbATop",              default = 0, type = int) # VQA 3000
+    
+    parser.add_argument("--questionLim",              default = 14, type = int) # VQA 3000
+    
     parser.add_argument("--ansEmbMod",              default = "NON", choices = ["NON", "SHARED", "BOTH"], type = str,   help = "BOTH: create word embeddings for answers. SHARED: share them with question embeddings.") #
-    parser.add_argument("--answerMod",              default = "NON", choices = ["NON", "MUL", "DIAG", "BL"], type = str, help = "operation for multiplication with answer embeddings: direct multiplication, scalar weighting, or bilinear") #
+    parser.add_argument("--answerMod",              default = "NON", choices = ["NON", "MUL", "DIAG", "BL"], type = str, help = "operation for multiplication with answer embeddings: direct multiplication, scalar weighting, or bilinear") # VQA
+    # in mc has to be ansMod not NON
+    parser.add_argument("--answerSumMod", default = "SUM", choices = ["SUM", "LIN"]) # VQA
+    parser.add_argument("--lossType",        default = "softmax", choices = ["softmax", "probSoftmax", "sigmoid", "svm"]) # VQA, oe
+    parser.add_argument("--lossWeight",            default = 1.0, type = float) # VQA
+    parser.add_argument("--weightedSoftmax", action = "store_true") # VQA
+
 
     ################ output unit (classifier)
     parser.add_argument("--outClassifierDims",      default = [512], nargs = "*",   type = int, help = "dimensions of the classifier") 
@@ -286,15 +346,16 @@ def parseArgs():
     parser.add_argument("--outImageDim",            default = 1024, type = int,     help = "dimension of linearized image fed to the output unit") 
     parser.add_argument("--outQuestion",            action = "store_true",          help = "feed the question to the output unit") 
     parser.add_argument("--outQuestionMul",         action = "store_true",          help = "feed the multiplication of question and memory to the output unit") 
+    parser.add_argument("--outAct",                 default = "NON", type = str,   choices = ["NON", "RELU", "TANH"]) # VQA
+    parser.add_argument("--outGate",                action = "store_true") # VQA
 
     ################ network
     
     parser.add_argument("--netLength",              default = 16, type = int,        help = "network length (number of cells)")      
-    # parser.add_argument("--netDim", default = 512, type = int)
     parser.add_argument("--memDim",                 default = 512, type = int,      help = "dimension of memory state")
     parser.add_argument("--ctrlDim",                default = 512, type = int,      help = "dimension of control state")
-    parser.add_argument("--attDim",                 default = 512, type = int,      help = "dimension of pre-attention interactions space")
-    parser.add_argument("--unsharedCells",          default = False, type = bool,   help = "unshare weights between cells ") 
+    parser.add_argument("--attDim",                 default = 512, type = int,      help = "dimension of pre-attention interactions space") # VQA
+    parser.add_argument("--unsharedCells",          action = "store_true",   help = "unshare weights between cells ") 
 
     # initialization
     parser.add_argument("--initCtrl",               default = "PRM", type = str,    choices = ["PRM", "ZERO", "Q"], help = "initialization mod for control")
@@ -321,23 +382,12 @@ def parseArgs():
     parser.add_argument("--controlFeedInputs",      action = "store_true",          help = "feed question representation")
     parser.add_argument("--controlContAct",         default = "NON", type = str,    choices = ["NON", "RELU", "TANH"], help = "activation on the words interactions")
     
+    parser.add_argument("--linearControl",        action = "store_true") 
+
     # step 2: word attention and optional projection 
     parser.add_argument("--controlConcatWords",     action = "store_true",          help = "concatenate words to interaction when computing attention") 
     parser.add_argument("--controlProj",            action = "store_true",          help = "apply linear projection on words interactions")
     parser.add_argument("--controlProjAct",         default = "NON", type = str,    choices = ["NON", "RELU", "TANH"], help = "activation for control interactions")
-
-    # parser.add_argument("--controlSelfAtt", default = False, type = bool) 
-
-    # parser.add_argument("--controlCoverage", default = False, type = bool)
-    # parser.add_argument("--controlCoverageBias", default = 1.0, type = float)
-
-    # parser.add_argument("--controlPostRNN", default = False, type = bool) 
-    # parser.add_argument("--controlPostRNNmod", default = "RNN", type = str) # GRU
-
-    # parser.add_argument("--selfAttShareInter", default = False, type = bool)
-
-    # parser.add_argument("--wordControl", default = False, type = bool)
-    # parser.add_argument("--gradualControl", default = False, type = bool)
 
     ################ read unit
     # step 1: KB-memory interactions
@@ -377,6 +427,7 @@ def parseArgs():
     parser.add_argument("--writeSelfAttMod",        default = "NON", type = str,    choices = ["NON", "CONT"], help = "control version to compare to")
 
     parser.add_argument("--writeMergeCtrl",           action = "store_true",          help = "merge control with memory") 
+    parser.add_argument("--writeMergeCtrlMul",           action = "store_true",          help = "merge control with memory") 
 
     parser.add_argument("--writeMemProj",           action = "store_true",          help = "project new memory")
     parser.add_argument("--writeMemAct",            default = "NON", type = str,    choices = ["NON", "RELU", "TANH"], help = "new memory activation")
@@ -386,49 +437,63 @@ def parseArgs():
     parser.add_argument("--writeGateShared",        action = "store_true",          help = "use one gate value for all dimensions of the memory state") 
     parser.add_argument("--writeGateBias",          default = 1.0, type = float,    help = "bias for the write unit gate (positive to bias for taking new memory)") 
 
-    ## modular
-    # parser.add_argument("--modulesNum", default = 10, type = int) 
-    # parser.add_argument("--controlBoth", default = False, type = bool)
-    # parser.add_argument("--addZeroModule", default = False, type = bool) 
-    # parser.add_argument("--endModule", default = False, type = bool) 
+    # new research VQA
+    parser.add_argument("--ansWeighting",              action = "store_true") 
+    parser.add_argument("--ansWeightingRoot",              action = "store_true")
 
-    ## hybrid
-    # parser.add_argument("--hybrid",      default = False, type = bool, help = "hybrid attention cnn model") 
-    # parser.add_argument("--earlyHybrid", default = False, type = bool) 
-    # parser.add_argument("--lateHybrid",  default = False, type = bool) 
+    parser.add_argument("--unkEmb",              action = "store_true")
+    parser.add_argument("--unkThreshold",        default = 10, type = int) 
+    parser.add_argument("--unkSharedGate",        action = "store_true")  
+    parser.add_argument("--unkGate",        action = "store_true") 
+    parser.add_argument("--unkGateBias",        default = 0.0, type = float) 
+    parser.add_argument("--wordMapping",        action = "store_true") 
 
-    ## autoencoders
-    # parser.add_argument("--autoEncMem",         action = "store_true",          help = "add memory2control auto-encoder loss")
-    # parser.add_argument("--autoEncMemW",        default = 0.0001, type = float, help = "weight for auto-encoder loss")
-    # parser.add_argument("--autoEncMemInputs",   default = "INFO", type = str,   choices = ["MEM", "INFO"], help = "inputs to auto-encoder")
-    # parser.add_argument("--autoEncMemAct",      default = "NON", type = str,    choices = ["NON", "RELU", "TANH"], help = "activation type in the auto-encoder")
-    # parser.add_argument("--autoEncMemLoss",     default = "CONT", type = str,   choices = ["CONT", "PROB", "SMRY"], help = "target for the auto-encoder loss")
-    # parser.add_argument("--autoEncMemCnct",     action = "store_true",          help = "concat word attentions to auto-encoder features")
-
-    # parser.add_argument("--autoEncCtrl",        action = "store_true")
-    # parser.add_argument("--autoEncCtrlW",       default = 0.0001, type = float)
-    # parser.add_argument("--autoEncCtrlGRU",     action = "store_true")
- 
-    ## temperature
-    # parser.add_argument("--temperature",    default = 1.0, type = float,        help = "temperature for modules softmax") #
-    # parser.add_argument("--tempParametric", action = "store_true",              help = "parametric temperature") #
-    # parser.add_argument("--tempDynamic",    action = "store_true",              help = "dynamic temperature") #
-    # parser.add_argument("--tempAnnealRate", default = 0.000004, type = float,   help = "temperature annealing rate") #
-    # parser.add_argument("--tempMin",        default = 0.5, type = float,        help = "minimum temperature") #
-
-    ## gumbel
-    # parser.add_argument("--gumbelSoftmax",      action = "store_true", help = "use gumbel for the module softmax (soft for training and hard for testing)") #
-    # parser.add_argument("--gumbelSoftmaxBoth",  action = "store_true", help = "use softmax for training and testing") #
-    # parser.add_argument("--gumbelArgmaxBoth",   action = "store_true", help = "use argmax for training and testing") #
+    parser.add_argument("--wordByWord",         action = "store_true") 
+    parser.add_argument("--groundingGate",      action = "store_true") 
     
+    parser.add_argument("--predControl",            action = "store_true") 
+    parser.add_argument("--sharedPred",            action = "store_true")
+    parser.add_argument("--predControlSigmoid",            action = "store_true") 
+
+    parser.add_argument("--controlAnsComplement",            action = "store_true") 
+
+    parser.add_argument("--splitAnsPred",            action = "store_true") 
+
+    parser.add_argument("--memProb",            action = "store_true") 
+
+    parser.add_argument("--wordStandardDp",  default = 1.0, type = float) # **
+    parser.add_argument("--wordDp",  default = 1.0, type = float) # **
+    parser.add_argument("--vocabDp",  default = 1.0, type = float) # **
+    parser.add_argument("--objectDp",  default = 1.0, type = float) # **
+
+    parser.add_argument("--ansType",            action = "store_true") 
+    parser.add_argument("--ansFreq",            action = "store_true") 
+    parser.add_argument("--ansGroupByControl",  action = "store_true") 
+    parser.add_argument("--ansByMem",  action = "store_true") 
+
+    parser.add_argument("--genLossWeight",  default = 1.0, type = float)
+
     parser.parse_args(namespace = config) 
 
 ###################################### dataset configuration ######################################
 
+def configVG():
+    config.dataPath = "{dataBasedir}".format(dataBasedir = config.dataBasedir)
+    config.datasetFilename = "question_answers.json"
+    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "./CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+
+def configV7W():
+    config.dataPath = "{dataBasedir}".format(dataBasedir = config.dataBasedir)
+    config.datasetFilename = "dataset_v7w_telling.json"
+    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "./CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+
 def configCLEVR():
     config.dataPath = "{dataBasedir}/CLEVR_v1/data".format(dataBasedir = config.dataBasedir)
-    config.datasetFilename = "CLEVR_{tier}_questions.json"
-    config.wordVectorsFile = "./CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdEmbDim) #
+    config.datasetFilename = "CLEVR_{tier}H_questions.json"
+    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
     config.imageDims = [14, 14, 1024]
     config.programLims = [5, 10, 15, 20]
@@ -438,22 +503,9 @@ def configNLVR():
     config.dataPath = "{dataBasedir}/nlvr".format(dataBasedir = config.dataBasedir)
     config.datasetFilename = "{tier}.json"
     config.imagesFilename = "{{tier}}_{featureType}.h5".format(featureType = config.featureType)
-    config.imgIdsFilename = "{tier}ImgIds.json"
-    config.wordVectorsFile = "./CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdEmbDim) #
+    config.wordVectorsFile = "./CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
 
     config.questionLims = [12]
-    # config.noRebucket = True 
-
-    # if config.stemKernelSizes == []:
-    #     if config.featureType.endsWith("128x32"):
-    #         config.stemKernelSizes = [8, 4, 4]
-    #         config.stemStrideSizes = [2, 2, 1]
-    #         config.stemNumLayers = 3
-    #     if config.featureType.endsWith("512x128"): 
-    #         config.stemKernelSizes = [8, 4, 4, 2]
-    #         config.stemStrideSizes = [4, 2, 2, 1]
-    #         config.stemNumLayers = 4
-    # config.stemDim = 64
 
     if config.featureType == "resnet101_512x128":
         config.imageDims = [8, 32, 1024]
@@ -465,8 +517,60 @@ def configNLVR():
         size = config.featureType.split("_")[-1].split("x")
         config.imageDims = [int(size[1]) / stridesOverall, int(size[0]) / stridesOverall, 3]
 
+def configGQA():
+    config.dataPath = "{dataBasedir}/gqa/{subdir}".format(dataBasedir = config.dataBasedir, subdir = config.subdir)
+    config.generatedPrefix += "_{dataSubset}_{featureType}_".format(dataSubset = config.dataSubset, featureType = config.featureType)
+    config.datasetFilename = "{dataSubset}_{{tier}}_questions.json".format(dataSubset = config.dataSubset)
+    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+
+    config.imagesFilename = "{featureType}.h5".format(featureType = config.featureType)
+
+    config.imgsInfoFilename = "{featureType}_imgsInfo.json".format(featureType = config.featureType)
+
+    if config.subdir != "./":
+        config.imagesFilename = "../" + config.imagesFilename
+        config.imgsInfoFilename = "../" + config.imgsInfoFilename
+
+    if config.answerBias:
+        config.answerSumMod = "LIN"
+
+    config.questionLims = [5, 7, 10, 15] 
+
+def configVQA():
+    config.dataPath = "{dataBasedir}".format(dataBasedir = config.dataBasedir) # /vqa
+
+    # "test-dev"
+    dataVer = "v{ver}".format(ver = config.dataVer)
+    config.generatedPrefix += "{ver}_{ansFormat}_".format(ver = dataVer, ansFormat = config.ansFormat)
+    config.datasetFilename = "{ver}_{ansFormat}_{{tier}}_questions.json".format(ver = dataVer, ansFormat = config.ansFormat)
+    config.annotationsFilename = "{ver}_{{tier}}_annotations.json".format(ver = dataVer)
+    config.pairsFilename = "{ver}_{{tier}}_complementary_pairs.json".format(ver = dataVer)
+    config.imagesFilename = "{{tier}}_{featureType}.h5".format(featureType = config.featureType)
+    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim)
+    answersFilename = "{tier}Answers-{expName}.json"
+    config.wordVectorsSemanticFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+
+    if config.imageObjects:
+        config.imgsInfoFilename = "{{tier}}_{featureType}_imgsInfo.json".format(featureType = config.featureType)
+
+    if config.semantic:
+        config.vocabFilename = "{type}_vocab.txt"
+
+    config.questionLims = [5, 7, 10, 15]
+
+    if config.answerBias:
+        config.answerSumMod = "LIN"
+
+    if config.ansFormat == "mc":
+        config.answerMod = "MUL" if config.answerMod == "NON" else config.answerMod
+
 ## dataset specific configs
 loadDatasetConfig = {
+    "V7W": configV7W,
+    "VG": configVG,
     "CLEVR": configCLEVR,
-    "NLVR": configNLVR
+    "NLVR": configNLVR,
+    "VQA": configVQA,
+    "GQA": configGQA
 }

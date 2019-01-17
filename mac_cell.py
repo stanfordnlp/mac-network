@@ -57,8 +57,9 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
         knowledgeBase: 
     '''
     def __init__(self, vecQuestions, questionWords, questionCntxWords, questionLengths, 
-            knowledgeBase, memoryDropout, readDropout, writeDropout, 
-            batchSize, train, reuse = None):
+            knowledgeBase, memoryDropout, readDropout, 
+            writeDropout, controlDropoutPre, controlDropoutPost, wordDropout, vocabDropout,
+            objectDropout, batchSize, train, kbSize = None, reuse = None):
         
         self.vecQuestions = vecQuestions
         self.questionWords = questionWords
@@ -66,11 +67,17 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
         self.questionLengths = questionLengths
 
         self.knowledgeBase = knowledgeBase
+        self.kbSize = kbSize
 
         self.dropouts = {}
         self.dropouts["memory"] = memoryDropout 
         self.dropouts["read"] = readDropout 
         self.dropouts["write"] = writeDropout
+        self.dropouts["controlPre"] = controlDropoutPre
+        self.dropouts["controlPost"] = controlDropoutPost
+        self.dropouts["word"] = wordDropout
+        self.dropouts["vocab"] = vocabDropout
+        self.dropouts["object"] = objectDropout
 
         self.none = tf.zeros((batchSize, 1), dtype = tf.float32)
 
@@ -92,7 +99,6 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
     def output_size(self):
         return 1
 
-    # pass encoder hidden states to control?
     '''
     The Control Unit: computes the new control state -- the reasoning operation,
     by summing up the word embeddings according to a computed attention distribution.
@@ -131,7 +137,7 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
         [batchSize, ctrlDim]
     '''
     def control(self, controlInput, inWords, outWords, questionLengths,
-        control, contControl = None, name = "", reuse = None):
+        append = True, control = None, contControl = None, name = "", reuse = None):
 
         with tf.variable_scope("control" + name, reuse = reuse):
             dim = config.ctrlDim
@@ -167,19 +173,18 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
 
             # compute attention distribution over words and summarize them accordingly 
             logits = ops.inter2logits(interactions, dim)
-            # self.interL = (interW, interb)
 
-            # if config.controlCoverage:
-            #     logits += coverageBias * coverage
+            if config.wordDp < 1.0:
+                logits = tf.nn.dropout(logits, self.dropouts["word"])
 
             attention = tf.nn.softmax(ops.expMask(logits, questionLengths))
-            self.attentions["question"].append(attention)
-
-            # if config.controlCoverage:
-            #     coverage += attention # Add logits instead?               
+            if append:
+                self.attentions["question"].append(attention)
 
             newControl = ops.att2Smry(attention, outWords) 
             
+            gateDim = config.ctrlDim
+
             # ablation: use continuous control (pre-attention) instead
             if config.controlContinuous:
                 newControl = newContControl
@@ -208,7 +213,8 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
     '''
     def read(self, knowledgeBase, memory, control, name = "", reuse = None):
         with tf.variable_scope("read" + name, reuse = reuse):
-            dim = config.memDim 
+            dim = config.memDim
+            interDim = dim
 
             ## memory dropout
             if config.memoryVariationalDropout:
@@ -236,14 +242,14 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
             if config.readMemProj:
                 interactions = ops.linear(interactions, interDim, dim, act = config.readMemAct, 
                     name = "memKbProj")
-            else: 
+            else:
                 dim = interDim
 
             ## Step 2: compute interactions with control
             if config.readCtrl:
                 # compute interactions with control
                 if config.ctrlDim != dim:
-                    control = ops.linear(control, ctrlDim, dim, name = "ctrlProj")
+                    control = ops.linear(control, config.ctrlDim, dim, name = "ctrlProj")
 
                 interactions, interDim = ops.mul(interactions, control, dim, 
                     interMod = config.readCtrlAttType, concat = {"x": config.readCtrlConcatInter}, 
@@ -263,7 +269,11 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
 
             ## Step 3: sum attentions up over the knowledge base
             # transform vectors to attention distribution
-            attention = ops.inter2att(interactions, dim, dropout = self.dropouts["read"])
+            if config.objectDp < 1.0:
+                interactions = tf.nn.dropout(interactions, self.dropouts["object"])
+
+            attention = ops.inter2att(interactions, dim, dropout = self.dropouts["read"], 
+                mask = self.kbSize)
 
             self.attentions["kb"].append(attention)
 
@@ -317,14 +327,10 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
                 selfControl = control
                 if config.writeSelfAttMod == "CONT":
                     selfControl = contControl
-                # elif config.writeSelfAttMod == "POST":
-                #     selfControl = postControl
                 selfControl = ops.linear(selfControl, config.ctrlDim, config.ctrlDim, name = "ctrlProj")
                 
                 interactions = self.controls * tf.expand_dims(selfControl, axis = 1)
 
-                # if config.selfAttShareInter: 
-                #     selfAttlogits = self.linearP(selfAttInter, config.encDim, 1, self.interL[0], self.interL[1], name = "modSelfAttInter")
                 attention = ops.inter2att(interactions, config.ctrlDim, name = "selfAttention")
                 self.attentions["self"].append(attention) 
                 selfSmry = ops.att2Smry(attention, self.memories)
@@ -344,8 +350,17 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
                 dim += config.memDim
 
             if config.writeMergeCtrl:
-                newMemory = tf.concat([newMemory, control], axis = -1)
-                dim += config.memDim                
+                #project memory back to memory dimension
+                if config.writeMemProj or (dim != config.memDim):
+                    newMemory = ops.linear(newMemory, dim, config.memDim, name = "newMemoryCtrl")
+                    dim = config.memDim
+                    
+                if config.writeMergeCtrlMul:
+                    newMemory = tf.concat([newMemory, newMemory * control], axis = -1) # control, 
+                    dim += config.memDim # 2 *               
+                else:
+                    newMemory = tf.concat([newMemory, control], axis = -1)
+                    dim += config.memDim  
 
             # project memory back to memory dimension
             if config.writeMemProj or (dim != config.memDim):
@@ -389,7 +404,7 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
                     concat = {"x": config.autoEncMemCnct}, mulBias = config.mulBias, name = "aeMem")
                 
                 logits = ops.inter2logits(interactions, dim)
-                logits = self.expMask(logits, self.questionLengths)
+                logits = ops.expMask(logits, self.questionLengths)
 
                 # reconstruct word attentions
                 if config.autoEncMemLoss == "PROB":
@@ -442,19 +457,30 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
             controlInput = ops.linear(self.vecQuestions, config.ctrlDim, config.ctrlDim, 
                 name = inputName, reuse = inputReuse)
 
-            controlInput = ops.activations[config.controlInputAct](controlInput)
+            if not config.linearControl:
+                controlInput = ops.activations[config.controlInputAct](controlInput)
 
-            controlInput = ops.linear(controlInput, config.ctrlDim, config.ctrlDim, 
-                name = inputNameU, reuse = inputReuseU)
+                controlInput = ops.linear(controlInput, config.ctrlDim, config.ctrlDim, 
+                    name = inputNameU, reuse = inputReuseU)
 
-            newControl, self.contControl = self.control(controlInput, self.inWords, self.outWords, 
-                self.questionLengths, control, self.contControl, name = cellName, reuse = cellReuse)
+            if config.controlInWordsProj and config.controlOutWordsProj:
+                if config.controlPostDropout < 1.0:
+                    inWords = tf.nn.dropout(self.inWords, self.dropouts["controlPost"])
+                    outWords = inWords
+                else:
+                    inWords = self.inWords
+                    outWords = self.outWords                    
+            else:
+                inWords = self.inWords
+                outWords = self.outWords
+            
+            newControl, self.contControl = self.control(controlInput, inWords, outWords, 
+                self.questionLengths, control = control, contControl = self.contControl, name = cellName, reuse = cellReuse)
             
             # read unit
             # ablation: use whole question as control
             if config.controlWholeQ:                    
                 newControl = self.vecQuestions
-                # ops.linear(self.vecQuestions, config.ctrlDim, projDim, name = "qMod") 
 
             info = self.read(self.knowledgeBase, memory, newControl, name = cellName, reuse = cellReuse) 
 
@@ -463,18 +489,11 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
                 info = tf.nn.dropout(info, self.dropouts["write"])
             
             newMemory = self.write(memory, info, newControl, self.contControl, name = cellName, reuse = cellReuse)
-
-            # add auto encoder loss for memory
-            # if config.autoEncMem:
-            #     self.autoEncLosses["memory"] += memAutoEnc(newMemory, info, newControl)
         
             # append as standard list?
             self.controls = tf.concat([self.controls, tf.expand_dims(newControl, axis = 1)], axis = 1)
             self.memories = tf.concat([self.memories, tf.expand_dims(newMemory, axis = 1)], axis = 1)
             self.infos = tf.concat([self.infos, tf.expand_dims(info, axis = 1)], axis = 1)
-
-            # self.contControls = tf.concat([self.contControls, tf.expand_dims(contControl, axis = 1)], axis = 1)
-            # self.postControls = tf.concat([self.controls, tf.expand_dims(postControls, axis = 1)], axis = 1)
 
         newState = MACCellTuple(newControl, newMemory)
         return self.none, newState
@@ -516,7 +535,7 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
 
     Returns the updated word sequence and lengths.  
     '''
-    def addNullWord(words, lengths):
+    def addNullWord(self, words, lengths):
         nullWord = tf.get_variable("zeroWord", shape = (1 , config.ctrlDim), initializer = tf.random_normal_initializer())                    
         nullWord = tf.tile(tf.expand_dims(nullWord, axis = 0), [self.batchSize, 1, 1])
         words = tf.concat([nullWord, words], axis = 1)
@@ -551,39 +570,35 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
         self.infos = tf.expand_dims(initialMemory, axis = 1)
         
         self.contControl = initialControl
-        # self.contControls = tf.expand_dims(initialControl, axis = 1)
-        # self.postControls = tf.expand_dims(initialControl, axis = 1)
-
 
         ## initialize knowledge base
         # optionally merge question into knowledge base representation
         if config.initKBwithQ != "NON":
-            iVecQuestions = ops.linear(self.vecQuestions, config.ctrlDim, config.memDim, name = "questions") 
+            if config.imageObjects:
+                self.knowledgeBase = ops.linear(self.knowledgeBase, config.imageDims[-1], config.memDim, name = "initKB")
+            else:
+                iVecQuestions = ops.linear(self.vecQuestions, config.ctrlDim, config.memDim, name = "questions") 
 
-            concatMul = (config.initKBwithQ == "MUL") 
-            cnct, dim = ops.concat(self.knowledgeBase, iVecQuestions, config.memDim, mul = concatMul, expandY = True)
-            self.knowledgeBase = ops.linear(cnct, dim, config.memDim, name = "initKB")
-
+                concatMul = (config.initKBwithQ == "MUL") 
+                cnct, dim = ops.concat(self.knowledgeBase, iVecQuestions, config.memDim, mul = concatMul, expandY = True)
 
         ## initialize question words
         # choose question words to work with (original embeddings or encoder outputs)
-        words = self.questionCntxWords if config.controlContextual else self.questionWords
-        
+        words = self.questionCntxWords if config.controlContextual else self.questionWords    
+
         # optionally add parametric "null" word in the to all questions
         if config.addNullWord:
-            words, questionLengths = self.addNullWord(words, questionLengths)
+            words, self.questionLengths = self.addNullWord(words, self.questionLengths)
 
         # project words
+        if config.controlPreDropout < 1.0:
+            words = tf.nn.dropout(words, self.dropouts["controlPre"])
+
         self.inWords = self.outWords = words
         if config.controlInWordsProj or config.controlOutWordsProj:
-            pWords = ops.linear(words, config.ctrlDim, config.ctrlDim, name = "wordsProj") 
+            pWords = ops.linear(words, config.wrdQEmbDim, config.ctrlDim, name = "wordsProj")
             self.inWords = pWords if config.controlInWordsProj else words
             self.outWords = pWords if config.controlOutWordsProj else words
-
-        # if config.controlCoverage:
-        #     self.coverage = tf.zeros((batchSize, tf.shape(words)[1]), dtype = tf.float32)
-        #     self.coverageBias = tf.get_variable("coverageBias", shape = (),
-        #         initializer = config.controlCoverageBias)  
 
         ## initialize memory variational dropout mask
         if config.memoryVariationalDropout:
