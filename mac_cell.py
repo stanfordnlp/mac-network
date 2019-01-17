@@ -581,7 +581,8 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
 
                 concatMul = (config.initKBwithQ == "MUL") 
                 cnct, dim = ops.concat(self.knowledgeBase, iVecQuestions, config.memDim, mul = concatMul, expandY = True)
-
+                self.knowledgeBase = ops.linear(cnct, dim, config.memDim, name = "initKB")
+                
         ## initialize question words
         # choose question words to work with (original embeddings or encoder outputs)
         words = self.questionCntxWords if config.controlContextual else self.questionWords    
