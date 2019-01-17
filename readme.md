@@ -47,7 +47,7 @@ cd ../
 ## Training 
 To train the model, run the following command:
 ```bash
-python main.py --expName "gqaExperiment" --train --testedNum 10000 --epochs 25 --netLength 4 @configs/gqa.txt
+python main.py --expName "gqaExperiment" --train --testedNum 10000 --epochs 25 --netLength 4 @configs/gqa/gqa.txt
 ```
 
 First, the program preprocesses the GQA questions. It tokenizes them and maps them to integers to prepare them for the network. It then stores a JSON with that information about them as well as word-to-integer dictionaries in the `data` directory.
@@ -65,7 +65,7 @@ See [`config.py`](config.py) for further available options (Note that some of th
 ## Evalutation
 To evaluate the trained model, and get predictions and attention maps, run the following: 
 ```bash
-python main.py --expName "gqaExperiment" --finalTest --testedNum 10000 --netLength 4 -r --getPreds --getAtt @configs/args.txt
+python main.py --expName "gqaExperiment" --finalTest --testedNum 10000 --netLength 4 -r --getPreds --getAtt @configs/gqa/gqa.txt
 ```
 The command will restore the model we have trained, and evaluate it on the validation set. JSON files with predictions and the attention distributions resulted by running the model are saved by default to `./preds/{expName}`.
 
@@ -74,9 +74,9 @@ The command will restore the model we have trained, and evaluate it on the valid
 ## Baselines 
 Other language and vision based baselines are available. Run them by the following commands:
 ```bash
-python main.py --expName "gqaLSTM" --train --testedNum 10000 --epochs 25 @configs/gqaLSTM.txt
-python main.py --expName "gqaCNN" --train --testedNum 10000 --epochs 25 @configs/gqaCNN.txt
-python main.py --expName "gqaLSTM-CNN" --train --testedNum 10000 --epochs 25 @configs/gqaLSTM-CNN.txt
+python main.py --expName "gqaLSTM" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaLSTM.txt
+python main.py --expName "gqaCNN" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaCNN.txt
+python main.py --expName "gqaLSTM-CNN" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaLSTMCNN.txt
 ```
 
 ## Bibtex
