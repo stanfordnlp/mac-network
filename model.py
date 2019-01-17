@@ -220,7 +220,7 @@ class MACnet(object):
             if config.imageObjects: # VQA ??? or config.useBaseline:
                 features, dim = images, inDim
                 if config.stemLinear:
-                    features = ops.linear(images, inDim, outDim, dropout = self.dropouts["stem"] if config.stemDp else 1.0)
+                    features = ops.linear(images, inDim, outDim, dropout = self.dropouts["stem"])
                     dim = outDim
                 elif config.stemDeep:
                     dims = [inDim] + config.stemDims + [outDim]

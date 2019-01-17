@@ -149,7 +149,7 @@ def parseArgs():
     # parser.add_argument("--featureType",     default = "norm_128x32", type = str,   help = "features type") #   
     # resnet101_512x128, norm_400x100, none_80x20, normPerImage_80x20, norm_80x20
     parser.add_argument("--dataVer",         default = 2, type = int) # VQA
-    parser.add_argument("--dataSubset",      default = "samQuestions", type = str) # VQA
+    parser.add_argument("--dataSubset",      default = "balanced", type = str) # VQA
     parser.add_argument("--ansFormat",       default = "oe", choices = ["oe", "mc"], type = str) # open-ended, multiple-choices # VQA
     parser.add_argument("--ansTokenize",     action = "store_true") # VQA tokenize answer words into list
     # if true, then prediction has to be sentence prediction, like in captioning (NOT SUPPORTED YET)
@@ -181,7 +181,6 @@ def parseArgs():
 
     # bucketing
     parser.add_argument("--noBucket",       action = "store_true",      help = "bucket data according to question length")        
-    parser.add_argument("--noRebucket",     action = "store_true",      help = "bucket data according to question and program length") #
     
     # filtering
     parser.add_argument("--tOnlyChain",     action = "store_true",      help = "train only chain questions")
@@ -228,9 +227,9 @@ def parseArgs():
     parser.add_argument("--bnScale",    action = "store_true",              help = "batch norm with scaling")
 
     ## dropouts
-    parser.add_argument("--encInputDropout", default = 0.85, type = float,   help = "dropout of the rnn inputs to the Question Input Unit") 
+    parser.add_argument("--encInputDropout", default = 0.8, type = float,   help = "dropout of the rnn inputs to the Question Input Unit") 
     parser.add_argument("--encStateDropout", default = 1.0, type = float,   help = "dropout of the rnn states of the Question Input Unit") 
-    parser.add_argument("--stemDropout",     default = 0.82, type = float,  help = "dropout of the Image Input Unit (the stem)")
+    parser.add_argument("--stemDropout",     default = 0.8, type = float,  help = "dropout of the Image Input Unit (the stem)")
 
     parser.add_argument("--qDropout",       default = 0.92, type = float,    help = "dropout on the question vector") 
     # parser.add_argument("--qDropoutOut",    default = 1.0, type = float,    help = "dropout on the question vector the goes to the output unit") 
@@ -281,14 +280,13 @@ def parseArgs():
     ################ image input unit (the "stem")
     parser.add_argument("--stemDims",      default = [512], nargs = "*",   type = int, help = "dimensions of the classifier") 
     parser.add_argument("--stemDim",         default = 512, type = int,               help = "dimension of stem CNNs") 
-    parser.add_argument("--stemNumLayers",   default = 2, type = int,                 help = "number of stem layers")
+    parser.add_argument("--stemNumLayers",   default = 1, type = int,                 help = "number of stem layers")
     parser.add_argument("--stemKernelSize",  default = 3, type = int,                 help = "kernel size for stem (same for all the stem layers)")
     parser.add_argument("--stemKernelSizes", default = None, nargs = "*", type = int, help = "kernel sizes for stem (per layer)")
     parser.add_argument("--stemStrideSizes", default = None, nargs = "*", type = int, help = "stride sizes for stem (per layer)")
     parser.add_argument("--stemNormalize",   action = "store_true") # VQA 
 
     parser.add_argument("--stemLinear",             action = "store_true",          help = "use a linear stem (instead of CNNs)") #
-    parser.add_argument("--stemDp",                 action = "store_true",          help = "use a linear stem (instead of CNNs)") #
     parser.add_argument("--stemDeep",               action = "store_true",          help = "use a linear stem (instead of CNNs)") #
     parser.add_argument("--stemAct",                default = "NON", type = str,    choices = ["NON", "RELU", "TANH"], help = "nonlinearity type for grid") #
 
@@ -360,7 +358,7 @@ def parseArgs():
     # initialization
     parser.add_argument("--initCtrl",               default = "PRM", type = str,    choices = ["PRM", "ZERO", "Q"], help = "initialization mod for control")
     parser.add_argument("--initMem",                default = "PRM", type = str,    choices = ["PRM", "ZERO", "Q"], help = "initialization mod for memory")
-    parser.add_argument("--initKBwithQ",            default = "NON", type = str,    choices = ["NON", "CNCT", "MUL"], help = "merge question with knowledge base")
+    parser.add_argument("--initKBwithQ",            default = "MUL", type = str,    choices = ["NON", "CNCT", "MUL"], help = "merge question with knowledge base")
     parser.add_argument("--addNullWord",            action = "store_true",          help = "add parametric word in the beginning of the question") 
 
     ################ control unit
@@ -374,7 +372,7 @@ def parseArgs():
     parser.add_argument("--controlOutWordsProj",    action = "store_true",          help = "apply linear projection over words for summary computation") 
 
     parser.add_argument("--controlInputUnshared",   action = "store_true",          help = "use different question representation for each cell") 
-    parser.add_argument("--controlInputAct",        default = "TANH", type = str,   choices = ["NON", "RELU", "TANH"], help = "activation for question projection")
+    parser.add_argument("--controlInputAct",        default = "RELU", type = str,   choices = ["NON", "RELU", "TANH"], help = "activation for question projection")
 
     # step 1: merging previous control and whole question  
     parser.add_argument("--controlFeedPrev",        action = "store_true",          help = "feed previous control state") 
@@ -520,7 +518,7 @@ def configNLVR():
 def configGQA():
     config.dataPath = "{dataBasedir}/data".format(dataBasedir = config.dataBasedir)
     config.generatedPrefix += "_{featureType}_".format(featureType = config.featureType)
-    config.datasetFilename = "{dataSubset}_{{tier}}_questions.json".format(dataSubset = config.dataSubset)
+    config.datasetFilename = "{dataSubset}_{{tier}}_data.json".format(dataSubset = config.dataSubset)
     config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
     config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
