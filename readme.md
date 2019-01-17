@@ -32,7 +32,7 @@ wget http://nlp.stanford.edu/data/glove.6B.zip
 unzip glove.6B.zip
 cd ../
 ```
-We also download glove word embeddings which we will use in our model. The `data` directory will hold all the data files we use during training.
+We also download GloVe word embeddings which we will use in our model. The `data` directory will hold all the data files we use during training.
 
 ### Feature extraction
 Both spatial ResNet-101 features as well as object-based faster-RCNN features are available for the GQA train, val, and test images. Download and extract them through the following commands (77GB):
