@@ -478,20 +478,20 @@ def parseArgs():
 def configVG():
     config.dataPath = "{dataBasedir}".format(dataBasedir = config.dataBasedir)
     config.datasetFilename = "question_answers.json"
-    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
-    config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsFile = "data/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "data/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
 def configV7W():
     config.dataPath = "{dataBasedir}".format(dataBasedir = config.dataBasedir)
     config.datasetFilename = "dataset_v7w_telling.json"
-    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
-    config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsFile = "data/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "data/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
 def configCLEVR():
     config.dataPath = "{dataBasedir}/CLEVR_v1/data".format(dataBasedir = config.dataBasedir)
     config.datasetFilename = "CLEVR_{tier}H_questions.json"
-    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
-    config.wordVectorsSemanticFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsFile = "../CLEVR_v1/data/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "../CLEVR_v1/data/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
     config.imageDims = [14, 14, 1024]
     config.programLims = [5, 10, 15, 20]
@@ -501,7 +501,7 @@ def configNLVR():
     config.dataPath = "{dataBasedir}/nlvr".format(dataBasedir = config.dataBasedir)
     config.datasetFilename = "{tier}.json"
     config.imagesFilename = "{{tier}}_{featureType}.h5".format(featureType = config.featureType)
-    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsFile = "data/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
 
     config.questionLims = [12]
 
@@ -519,8 +519,8 @@ def configGQA():
     config.dataPath = "{dataBasedir}/data".format(dataBasedir = config.dataBasedir)
     config.generatedPrefix += "_{featureType}_".format(featureType = config.featureType)
     config.datasetFilename = "{dataSubset}_{{tier}}_data.json".format(dataSubset = config.dataSubset)
-    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
-    config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsFile = "data/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "data/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
     config.imagesFilename = "{featureType}.h5".format(featureType = config.featureType)
 
@@ -545,9 +545,9 @@ def configVQA():
     config.annotationsFilename = "{ver}_{{tier}}_annotations.json".format(ver = dataVer)
     config.pairsFilename = "{ver}_{{tier}}_complementary_pairs.json".format(ver = dataVer)
     config.imagesFilename = "{{tier}}_{featureType}.h5".format(featureType = config.featureType)
-    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim)
+    config.wordVectorsFile = "data/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim)
     answersFilename = "{tier}Answers-{expName}.json"
-    config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsSemanticFile = "data/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
     if config.imageObjects:
         config.imgsInfoFilename = "{{tier}}_{featureType}_imgsInfo.json".format(featureType = config.featureType)
