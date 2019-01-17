@@ -360,7 +360,7 @@ def loadImageBatch(images, batch):
         for i, imageId in enumerate(batch["imageIds"]):
             numObjects = toInfo(imageId)["objectsNum"]
 
-            imageBatch[i, 0:numObjects] = toFile(imageId)["features-1"][imageId["idx"], 0:numObjects]
+            imageBatch[i, 0:numObjects] = toFile(imageId)["features"][imageId["idx"], 0:numObjects]
 
     else:
         imageBatch = np.stack([toFile(imageId)["features"][imageId["idx"]]     
