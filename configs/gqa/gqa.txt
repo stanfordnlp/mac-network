@@ -1,6 +1,6 @@
 --dataset=GQA
 --dataSubset=balanced
---featureType=vg_objects
+--featureType=gqa_objects
 --imageObjects
 --stemNormalize
 --lossType=sigmoid
