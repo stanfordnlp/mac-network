@@ -62,6 +62,14 @@ Then, the program trains the model. Weights are saved by default to `./weights/{
 
 See [`config.py`](config.py) for further available options (Note that some of them are still in an experimental stage).
 
+## Baselines 
+Other language and vision based baselines are available. Run them by the following commands:
+```bash
+python main.py --expName "gqaLSTM" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaLSTM.txt
+python main.py --expName "gqaCNN" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaCNN.txt
+python main.py --expName "gqaLSTM-CNN" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaLSTMCNN.txt
+```
+
 ## Evalutation
 To evaluate the trained model, and get predictions and attention maps, run the following: 
 ```bash
@@ -70,14 +78,6 @@ python main.py --expName "gqaExperiment" --finalTest --testedNum 10000 --netLeng
 The command will restore the model we have trained, and evaluate it on the validation set. JSON files with predictions and the attention distributions resulted by running the model are saved by default to `./preds/{expName}`.
 
 - In case you are interested in getting attention maps (`--getAtt`), and to avoid having large prediction files, we advise you to limit the number of examples evaluated to 5,000-20,000.
-
-## Baselines 
-Other language and vision based baselines are available. Run them by the following commands:
-```bash
-python main.py --expName "gqaLSTM" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaLSTM.txt
-python main.py --expName "gqaCNN" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaCNN.txt
-python main.py --expName "gqaLSTM-CNN" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaLSTMCNN.txt
-```
 
 ## Bibtex
 ```
