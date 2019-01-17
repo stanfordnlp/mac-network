@@ -6,7 +6,7 @@
 
 (still under consturction) This is an extension of the [MAC network](https://arxiv.org/pdf/1803.03067.pdf) to work on the <b>[the GQA dataset](https://cs.stanford.edu/people/dorarad/gqa/index2.html)</b>. GQA is a new dataset for real-world visual reasoning, offrering 20M diverse multi-step questions, all come along with short programs that represent their semantics, and visual pointers from words to the corresponding image regions. Here we extend the MAC network to work over VQA and GQA, and provide multiple baselines as well. 
 
-MAC is a fully differentiable model that learns to perform multi-step reasoning. See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](https://cs.stanford.edu/people/dorarad/mac/blog.html) for more information about the model, and visit the [GQA website](https://cs.stanford.edu/people/dorarad/gqa/index2.html) for all information about the new dataset, including examplaes, visualizations, paper and slides.
+MAC is a fully differentiable model that learns to perform multi-step reasoning. See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](https://cs.stanford.edu/people/dorarad/mac/blog.html) for more information about the model, and visit the [GQA website](https://cs.stanford.edu/people/dorarad/gqa/index2.html) for all information about the new dataset, including examples, visualizations, paper and slides.
 
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="420px">
@@ -50,7 +50,7 @@ To train the model, run the following command:
 python main.py --expName "gqaExperiment" --train --testedNum 10000 --epochs 25 --netLength 4 @configs/gqa.txt
 ```
 
-First, the program preprocesses the GQA questions. It tokenizes them and maps them to integers to prepare them for the network. It then stores a JSON with that information about them as well as word-to-integer dictionaries in the `./data` directory.
+First, the program preprocesses the GQA questions. It tokenizes them and maps them to integers to prepare them for the network. It then stores a JSON with that information about them as well as word-to-integer dictionaries in the `data` directory.
 
 Then, the program trains the model. Weights are saved by default to `./weights/{expName}` and statistics about the training are collected in `./results/{expName}`, where `expName` is the name we choose to give to the current experiment. 
 
