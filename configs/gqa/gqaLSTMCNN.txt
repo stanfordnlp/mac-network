@@ -1,6 +1,6 @@
 --dataset=GQA
 --dataSubset=balanced
---featureType=vg_spatial
+--featureType=gqa_spatial
 --lossType=sigmoid
 --npy
 --parallel
