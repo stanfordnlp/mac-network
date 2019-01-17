@@ -18,6 +18,11 @@ MAC is a fully differentiable model that learns to perform multi-step reasoning.
 - We have performed experiments on Maxwell Titan X GPU. We assume 12GB of GPU memory.
 - See [`requirements.txt`](requirements.txt) for the required python packages and run `pip install -r requirements.txt` to install them.
 
+Let's begin from cloning this reponsitory branch:
+```
+git clone -b GQA https://github.com/stanfordnlp/mac-network.git
+```
+
 ## Pre-processing
 Before training the model, we first have to download the GQA dataset and extract features for the images:
 
