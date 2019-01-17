@@ -946,14 +946,9 @@ class Preprocesser(object):
         else:
             if config.noBucket:
                 buckets = [data]
-            elif config.noRebucket:
+            else:
                 questionSep = self.lseparator("question", config.questionLims)
                 buckets = self.bucket(data, questionSep)
-            else:
-                programSep = self.lseparator("programSeq", config.programLims)
-                questionSep = self.lseparator("question", config.questionLims)
-                buckets = self.bucket(data, programSep)
-                buckets = self.rebucket(buckets, questionSep)
         return buckets
 
     ''' 

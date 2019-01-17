@@ -480,14 +480,14 @@ def parseArgs():
 def configVG():
     config.dataPath = "{dataBasedir}".format(dataBasedir = config.dataBasedir)
     config.datasetFilename = "question_answers.json"
-    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
-    config.wordVectorsSemanticFile = "./CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
 def configV7W():
     config.dataPath = "{dataBasedir}".format(dataBasedir = config.dataBasedir)
     config.datasetFilename = "dataset_v7w_telling.json"
-    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
-    config.wordVectorsSemanticFile = "./CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
 def configCLEVR():
     config.dataPath = "{dataBasedir}/CLEVR_v1/data".format(dataBasedir = config.dataBasedir)
@@ -503,7 +503,7 @@ def configNLVR():
     config.dataPath = "{dataBasedir}/nlvr".format(dataBasedir = config.dataBasedir)
     config.datasetFilename = "{tier}.json"
     config.imagesFilename = "{{tier}}_{featureType}.h5".format(featureType = config.featureType)
-    config.wordVectorsFile = "./CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
 
     config.questionLims = [12]
 
@@ -518,15 +518,15 @@ def configNLVR():
         config.imageDims = [int(size[1]) / stridesOverall, int(size[0]) / stridesOverall, 3]
 
 def configGQA():
-    config.dataPath = "{dataBasedir}/gqa/{subdir}".format(dataBasedir = config.dataBasedir, subdir = config.subdir)
-    config.generatedPrefix += "_{dataSubset}_{featureType}_".format(dataSubset = config.dataSubset, featureType = config.featureType)
+    config.dataPath = "{dataBasedir}/data".format(dataBasedir = config.dataBasedir)
+    config.generatedPrefix += "_{featureType}_".format(featureType = config.featureType)
     config.datasetFilename = "{dataSubset}_{{tier}}_questions.json".format(dataSubset = config.dataSubset)
-    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
-    config.wordVectorsSemanticFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim) #
+    config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
     config.imagesFilename = "{featureType}.h5".format(featureType = config.featureType)
 
-    config.imgsInfoFilename = "{featureType}_imgsInfo.json".format(featureType = config.featureType)
+    config.imgsInfoFilename = "{featureType}_info.json".format(featureType = config.featureType)
 
     if config.subdir != "./":
         config.imagesFilename = "../" + config.imagesFilename
@@ -547,9 +547,9 @@ def configVQA():
     config.annotationsFilename = "{ver}_{{tier}}_annotations.json".format(ver = dataVer)
     config.pairsFilename = "{ver}_{{tier}}_complementary_pairs.json".format(ver = dataVer)
     config.imagesFilename = "{{tier}}_{featureType}.h5".format(featureType = config.featureType)
-    config.wordVectorsFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim)
+    config.wordVectorsFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.wrdQEmbDim)
     answersFilename = "{tier}Answers-{expName}.json"
-    config.wordVectorsSemanticFile = "../CLEVR_v1/data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
+    config.wordVectorsSemanticFile = "data/glove/glove.6B.{dim}d.txt".format(dim = config.semanticWordsEmbDim) #
 
     if config.imageObjects:
         config.imgsInfoFilename = "{{tier}}_{featureType}_imgsInfo.json".format(featureType = config.featureType)

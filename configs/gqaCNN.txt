@@ -1,0 +1,17 @@
+--dataset=GQA
+--dataSubset=balanced
+--featureType=vg_spatial
+--lossType=sigmoid
+--npy
+--parallel
+--evalTrain
+--retainVal
+--useEMA
+--noBucket
+--adam
+--lrReduce
+--clip
+--relu=ELU
+--useBaseline
+--baselineCNN
+--stemNormalize
