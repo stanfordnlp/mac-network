@@ -9,8 +9,8 @@
 MAC is a fully differentiable model that learns to perform multi-step reasoning. See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](https://cs.stanford.edu/people/dorarad/mac/blog.html) for more information about the model, and visit the [GQA website](https://cs.stanford.edu/people/dorarad/gqa/index2.html) for all information about the new dataset, including examplaes, visualizations, paper and slides.
 
 <div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="390px">
-  <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:right" width="480px">
+  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="400px">
+  <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:right" width="400px">
 </div>
 
 ## Requirements
