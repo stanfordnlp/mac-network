@@ -40,7 +40,7 @@ cd ../
 We also download GloVe word embeddings which we will use in our model. The `data` directory will hold all the data files we use during training.
 
 ### Feature extraction
-Both spatial ResNet-101 features as well as object-based faster-RCNN features are available for the GQA train, val, and test images. Download, extract and merge them through the following commands (77GB).
+Both spatial ResNet-101 features as well as object-based faster-RCNN features are available for the GQA train, val, and test images. Download, extract and merge them through the following commands (53GB).
 
 ```bash
 cd data
