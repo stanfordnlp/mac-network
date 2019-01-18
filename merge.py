@@ -16,22 +16,22 @@ spec = {
 chunkSize = 10000
 
 # Merge hdf5 files
-with h5py.File("{name}/gqa_{name}.h5".format(name = args.name)) as out:
+with h5py.File("data/{name}/gqa_{name}.h5".format(name = args.name)) as out:
 	datasets  = {}
 	for dname in spec[args.name]:
 		datasets[dname] = out.create_dataset(dname, spec[args.name][dname])
 
 	for i in tqdm(range(11)):
-		with h5py.File("{name}/gqa_{name}_{index}.h5".format(name = args.name, index = i)) as chunk: 
+		with h5py.File("data/{name}/gqa_{name}_{index}.h5".format(name = args.name, index = i)) as chunk: 
 			for dname in spec[args.name]:
 				datasets[dname][(i * chunkSize):((i + 1) * chunkSize)] = chunk[dname][:]
 
 # Update info file
-with open("{name}/gqa_{name}_info.json".format(name = args.name)) as infoIn:
+with open("data/{name}/gqa_{name}_info.json".format(name = args.name)) as infoIn:
 	info = json.load(infoIn)
 	for imageId in info:
 		info[imageId]["index"] = info[imageId]["file"] * chunkSize + info[imageId]["idx"]
 		del info[imageId]["file"]
 
-	with open("{name}/gqa_{name}_merged_info.json".format(name = args.name)) as infoOut:
+	with open("data/{name}/gqa_{name}_merged_info.json".format(name = args.name)) as infoOut:
 		json.dump(info, infoMerged)
