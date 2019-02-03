@@ -830,7 +830,7 @@ class Preprocesser(object):
             dataset["train"] = self.readTier("train" + suffix, train = True)
 
         dataset["val"] = self.readTier("val" + suffix, train = trainOnVal)
-        dataset["test"] = self.readTier("test" + suffix, train = False)
+        dataset["test"] = self.readTier("val" + suffix, train = False) # loading validation data to test set since we can't evalute scores on the real test set 
 
         if hasTrain:
             dataset["evalTrain"] = {}
