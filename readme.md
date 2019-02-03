@@ -31,7 +31,7 @@ To download and unpack the data, run the following commands:
 ```bash
 mkdir data
 cd data
-wget https://s3-us-west-1.amazonaws.com/gqa/data.zip
+wget https://nlp.stanford.edu/data/gqa/data.zip
 unzip data.zip
 wget http://nlp.stanford.edu/data/glove.6B.zip
 unzip glove.6B.zip
