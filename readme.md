@@ -95,4 +95,4 @@ The command will restore the model we have trained, and evaluate it on the valid
 }
 ```
 
-Thank you for your interest in our model and the dataset! Please contact me at dorarad@cs.stanford.edu for any questions, comments, or suggestions! :-)
+Thank you for your interest in our model and the dataset! Please contact me at dorarad@stanford.edu for any questions, comments, or suggestions! :-)
