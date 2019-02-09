@@ -44,7 +44,7 @@ Both spatial ResNet-101 features as well as object-based faster-RCNN features ar
 
 ```bash
 cd data
-wget https://s3-us-west-1.amazonaws.com/gqa/images.zip
+wget http://nlp.stanford.edu/data/gqa/images.zip
 unzip images.zip
 cd ../
 python merge.py --name spatial 
