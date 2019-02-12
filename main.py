@@ -21,6 +21,7 @@ from termcolor import colored, cprint
 from config import config, loadDatasetConfig, parseArgs
 from preprocess import Preprocesser, bold, bcolored, writeline, writelist
 from model import MACnet
+from collections import defaultdict
 
 ############################################# loggers #############################################
 
@@ -81,7 +82,7 @@ def grouperKey(toKey):
     def grouper(instances):
         res = defaultdict(list)
         for instance in instances:
-            res[toKey(instnace)].append(instance)
+            res[toKey(instance)].append(instance)
         return res
     return grouper
 
