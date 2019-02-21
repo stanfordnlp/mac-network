@@ -38,6 +38,7 @@ unzip glove.6B.zip
 cd ../
 ```
 We also download GloVe word embeddings which we will use in our model. The `data` directory will hold all the data files we use during training.
+Note: `data.zip` matches the official dataset at [`visualreasoning.net`](https:/visualreasoning.net/download.html), but, in order to save space, contains about each question only the information needed to train MAC (e.g. doesn't contain the functional programs).
 
 ### Feature extraction
 Both spatial ResNet-101 features as well as object-based faster-RCNN features are available for the GQA train, val, and test images. Download, extract and merge them through the following commands (53GB).
