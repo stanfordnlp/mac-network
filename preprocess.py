@@ -753,7 +753,7 @@ class Preprocesser(object):
                         "questionStr": questionStr,
                         "question": question,
                         "answer": answer,
-                        "imageId": {"group": tier, "id": imageId, "idx": imageInfo["idx"]},
+                        "imageId": {"group": tier, "id": imageId, "idx": imageInfo["index"]},
                         "tier": tier,
                         "index": i,
                         "questionId": instance["questionId"]
