@@ -809,11 +809,8 @@ class Preprocesser(object):
             instancesFilename = config.instancesFile(tier)
 
         imgsInfoFilename = config.imgsInfoFile(tier)        
-        try:
-            with open(imgsInfoFilename, "r") as file:
-                imageIndex = json.load(file)  
-        except:
-            imageIndex = "dd"
+        with open(imgsInfoFilename, "r") as file:
+            imageIndex = json.load(file)  
         instances = self.readData(datasetFilename, instancesFilename, tier, train, imageIndex) # updateVocab = 
 
         images = {tier: {"imagesFilename": imagesFilename, "imgsInfoFilename": imgsInfoFilename}}       
