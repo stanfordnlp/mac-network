@@ -42,6 +42,7 @@ with open("data/{name}/gqa_{name}_info.json".format(name = args.name)) as infoIn
 	info = json.load(infoIn)
 	for imageId in info:
 		info[imageId]["index"] = info[imageId]["file"] * args.chunkSize + info[imageId]["idx"]
+		del info[imageId]["idx"]
 		del info[imageId]["file"]
 
 	with open("data/gqa_{name}_merged_info.json".format(name = args.name), "w") as infoOut:
