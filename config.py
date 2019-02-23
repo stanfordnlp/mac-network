@@ -131,7 +131,7 @@ def parseArgs():
     # data files
     parser.add_argument("--dataset",         default = "CLEVR", choices = ["CLEVR", "NLVR"], type = str) # 
     parser.add_argument("--dataBasedir",     default = "./", type = str,            help = "data base directory") # /jagupard14/scr1/dorarad/
-    parser.add_argument("--generatedPrefix", default = "gen", type = str,           help = "prefix for generated data files") 
+    parser.add_argument("--generatedPrefix", default = "gennew", type = str,           help = "prefix for generated data files") 
     parser.add_argument("--featureType",     default = "norm_128x32", type = str,   help = "features type") #   
     # resnet101_512x128, norm_400x100, none_80x20, normPerImage_80x20, norm_80x20
     
