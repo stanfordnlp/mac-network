@@ -64,6 +64,8 @@ First, the program preprocesses the GQA questions. It tokenizes them and maps th
 
 Then, the program trains the model. Weights are saved by default to `./weights/{expName}` and statistics about the training are collected in `./results/{expName}`, where `expName` is the name we choose to give to the current experiment. 
 
+Here we perform training on the balanced 1M subset of the GQA dataset, rather than the full (unbalanced) training set (14M). To train on the whole dataset add the following flag. 
+
 ### Notes
 - The number of examples used for training and evaluation can be set by `--trainedNum` and `--testedNum` respectively.
 - You can use the `-r` flag to restore and continue training a previously pre-trained model. 
