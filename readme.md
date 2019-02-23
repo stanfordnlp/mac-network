@@ -42,13 +42,15 @@ We also download GloVe word embeddings which we will use in our model. The `data
 Note: `data.zip` matches the official dataset at [`visualreasoning.net`](https://www.visualreasoning.net/download.html), but, in order to save space, contains about each question only the information needed to train MAC (e.g. doesn't contain the functional programs).
 
 ### Feature extraction
-Both spatial ResNet-101 features as well as object-based faster-RCNN features are available for the GQA train, val, and test images. Download, extract and merge the object-based features through the following commands (22GB).
+Both spatial ResNet-101 features as well as object-based faster-RCNN features are available for the GQA train, val, and test images. Download, extract and merge the features through the following commands (22GB).
 
 ```bash
 cd data
+wget http://nlp.stanford.edu/data/gqa/spatialFeatures.zip
 wget http://nlp.stanford.edu/data/gqa/objectFeatures.zip
 unzip objectFeatures.zip
 cd ../
+python merge.py --name spatial 
 python merge.py --name objects 
 ```
 
