@@ -13,9 +13,8 @@ MAC is a fully differentiable model that learns to perform multi-step reasoning.
   <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:right" width="390px">
 </div>
 
-**Note: In the original version of the code there was a small typo which led to models looking at the wrong images. It is fixed now, so please make sure to work with the most updated version of the repository. Thanks!**
-
 ## Requirements
+**Note: In the original version of the code there was a small typo which led to models looking at the wrong images. It is fixed now, so please make sure to work with the most updated version of the repository. Thanks!**
 - Tensorflow (originally has been developed with 1.3 but should work for later versions as well).
 - We have performed experiments on Maxwell Titan X GPU. We assume 12GB of GPU memory.
 - See [`requirements.txt`](requirements.txt) for the required python packages and run `pip install -r requirements.txt` to install them.
