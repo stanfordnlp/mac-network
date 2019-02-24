@@ -13,6 +13,8 @@ MAC is a fully differentiable model that learns to perform multi-step reasoning.
   <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:right" width="390px">
 </div>
 
+**Note: In the original version of the code there was a small typo which led to models looking at the wrong images. It is fixed now, so please make sure to work with the most updated version of the repository. Thanks!**
+
 ## Requirements
 - Tensorflow (originally has been developed with 1.3 but should work for later versions as well).
 - We have performed experiments on Maxwell Titan X GPU. We assume 12GB of GPU memory.
@@ -65,8 +67,6 @@ First, the program preprocesses the GQA questions. It tokenizes them and maps th
 Then, the program trains the model. Weights are saved by default to `./weights/{expName}` and statistics about the training are collected in `./results/{expName}`, where `expName` is the name we choose to give to the current experiment. 
 
 Here we perform training on the balanced 1M subset of the GQA dataset, rather than the full (unbalanced) training set (14M). To train on the whole dataset add the following flag: `--dataSubset all`.
-
-**Note: In the original version of the code there was a small typo which led to models looking at the wrong images. It is fixed now, so please make sure to work with the most updated version of the repository. Thanks!**
 
 ### Notes
 - The number of examples used for training and evaluation can be set by `--trainedNum` and `--testedNum` respectively.
