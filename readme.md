@@ -66,7 +66,7 @@ Then, the program trains the model. Weights are saved by default to `./weights/{
 
 Here we perform training on the balanced 1M subset of the GQA dataset, rather than the full (unbalanced) training set (14M). To train on the whole dataset add the following flag: `--dataSubset all`.
 
-**Note: In the original version of the code there was some small typo which led to models looking at the wrong images. It is fixed now, so please make sure to work with the most updated version of the repository. Thanks!**
+**Note: In the original version of the code there was a small typo which led to models looking at the wrong images. It is fixed now, so please make sure to work with the most updated version of the repository. Thanks!**
 
 ### Notes
 - The number of examples used for training and evaluation can be set by `--trainedNum` and `--testedNum` respectively.
