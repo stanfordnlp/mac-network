@@ -10,3 +10,4 @@ termcolor
 matplotlib
 seaborn
 pandas
+nltk
