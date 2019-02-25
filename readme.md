@@ -49,6 +49,7 @@ Both spatial ResNet-101 features as well as object-based faster-RCNN features ar
 cd data
 wget http://nlp.stanford.edu/data/gqa/spatialFeatures.zip
 wget http://nlp.stanford.edu/data/gqa/objectFeatures.zip
+unzip spatialFeatures.zip
 unzip objectFeatures.zip
 cd ../
 python merge.py --name spatial 
