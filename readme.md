@@ -1,4 +1,4 @@
-# GQA: a new dataset for real-world visual reasoning
+# GQA: A New Dataset for Real-World Visual Reasoning
 
 <p align="center">
   <b>Drew A. Hudson & Christopher D. Manning</b></span>
