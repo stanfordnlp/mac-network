@@ -3,15 +3,15 @@
   <b>Drew A. Hudson & Christopher D. Manning</b></span>
 </p>
 
-This is the implementation of [Compositional Attention Networks for Machine Reasoning](https://arxiv.org/pdf/1803.03067.pdf) (ICLR 2018). We propose a fully differentiable model that learns to perform multi-step reasoning and explore it in the context of the [CLEVR dataset](http://cs.stanford.edu/people/jcjohns/clevr/).
+This is the implementation of [Compositional Attention Networks for Machine Reasoning](https://arxiv.org/pdf/1803.03067.pdf) (ICLR 2018) on two visual reaosning datasets: [CLEVR dataset](http://cs.stanford.edu/people/jcjohns/clevr/) and the ***New*** [***GQA dataset***](https://visualreasoning.net) ([CVPR 2019](https://visualreasoning.net/gqaPaper.pdf)). We propose a fully differentiable model that learns to perform multi-step reasoning.
 See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](https://cs.stanford.edu/people/dorarad/mac/blog.html) for more information about the model!
 
 In particular, the implementation includes the MAC cell at [`mac_cell.py`](mac_cell.py). The code supports the standard cell as presented in the paper as well as additional extensions and variants. Run `python main.py -h` or see [`config.py`](config.py) for the complete list of options.
 
 <div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="250px">
-  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/visual.png" style="float:left" width="320px">
-  <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:left" width="250px">
+  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="260px">
+  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/visual.png" style="float:left" width="310px">
+  <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:left" width="280px">
 </div>
 
 ## Requirements
