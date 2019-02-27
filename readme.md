@@ -94,10 +94,22 @@ The command will restore the model we have trained, and evaluate it on the valid
 - In case you are interested in getting attention maps (`--getAtt`), and to avoid having large prediction files, we advise you to limit the number of examples evaluated to 5,000-20,000.
 
 ## Bibtex
+For the GQA dataset:
+```
+@article{hudson2018gqa,
+  title={GQA: A New Dataset for Compositional Question Answering over Real-World Images},
+  author={Hudson, Drew A and Manning, Christopher D},
+  journal={Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year={2019}
+}
+```
+
+For MAC:
 ```
 @article{hudson2018compositional,
-  title={GQA: a New Dataset for Compositional Question Answering over Real-World Images},
+  title={Compositional Attention Networks for Machine Reasoning},
   author={Hudson, Drew A and Manning, Christopher D},
+  journal={International Conference on Learning Representations (ICLR)},
   year={2018}
 }
 ```
