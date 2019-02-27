@@ -1,4 +1,4 @@
-# Compostional Attention Networks for Machine Reasoning
+# Compostional Attention Networks for Real-World Reasoning 
 <p align="center">
   <b>Drew A. Hudson & Christopher D. Manning</b></span>
 </p>
