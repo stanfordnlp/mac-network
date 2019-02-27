@@ -96,12 +96,23 @@ for x in preds/clevrExperiment/*Img*.png; do magick convert $x -brightness-contr
 ```
 
 ## Bibtex
+For MAC:
 ```
 @inproceedings{hudson2018compositional,
   title={Compositional Attention Networks for Machine Reasoning},
   author={Hudson, Drew A and Manning, Christopher D},
   journal={International Conference on Learning Representations (ICLR)},
   year={2018}
+}
+```
+
+For the GQA dataset:
+```
+@article{hudson2018gqa,
+  title={GQA: A New Dataset for Compositional Question Answering over Real-World Images},
+  author={Hudson, Drew A and Manning, Christopher D},
+  journal={Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year={2019}
 }
 ```
 
