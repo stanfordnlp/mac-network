@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import json
 import pandas
 import argparse 
@@ -6,6 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
 from scipy.misc import imread, imresize
 from matplotlib.colors import Normalize, LinearSegmentedColormap
+import os
 
 flatten = lambda ll: [e for l in ll for e in l]
 
@@ -39,35 +43,36 @@ isRight = lambda instance: instance["answer"] == instance["prediction"]
 isRightStr = lambda instance: "RIGHT" if isRight(instance) else "WRONG"
 
 # files
+def make_sure_dir(path):
+    dirname = os.path.dirname(path)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+        
 # jsonFilename = "valHPredictions.json" if args.humans else "valPredictions.json"
-imagesDir = "./CLEVR_v1/images/{tier}".format(
-    tier = args.tier)
-
+imagesDir = "./data/images" # suppose images of GQA are in this directory
+outputDir = "./preds/{expName}/{tier}Images".format(
+    tier = args.tier,
+    expName = args.expName)
+make_sure_dir(outputDir)
+    
 dataFile = "./preds/{expName}/{tier}Predictions-{expName}.json".format(
-    tier = args.tier, 
+    tier = args.tier,
     expName = args.expName)
 
-inImgName = lambda index: "{dir}/CLEVR_{tier}_{index}.png".format(
-    dir = imagesDir, 
-    index = ("000000%d" % index)[-6:],
-    tier = args.tier)
+inImgName = lambda instance: os.path.join(imagesDir, "{index}.jpg".format(index=instance["imageId"]["id"]))
 
-outImgAttName = lambda instance, j: "./preds/{expName}/{tier}{id}Img_{step}.png".format(
-    expName = args.expName, 
-    tier = args.tier, 
+outImgAttName = lambda instance, j: os.path.join(outputDir, "{id}/Img_{step}.png".format(
     id = instance["index"], 
-    step = j + 1)
+    step = j + 1))
 
-outTableAttName = lambda instance, name: "./preds/{expName}/{tier}{id}{tableName}_{right}{orientation}.png".format(
-    expName = args.expName, 
-    tier = args.tier, 
+outTableAttName = lambda instance, name: os.path.join(outputDir, "{id}/{tableName}_{right}{orientation}.png".format(
     id = instance["index"], 
     tableName = name, 
-    right = isRightStr(instance), 
-    orientation = "_t" if args.trans else "")
+    right = isRightStr(instance),
+    orientation = "_t" if args.trans else ""))
 
 # plotting
-imageDims = (14,14)
+imageDims = (10,10)
 figureImageDims = (2,3)
 figureTableDims = (5,4)
 fontScale = 1
@@ -82,6 +87,7 @@ cdict["alpha"] = ((0.0, 0.35, 0.35),
 plt.register_cmap(name = "custom", data = cdict)
 
 def savePlot(fig, fileName):
+    make_sure_dir(fileName)
     plt.savefig(fileName, dpi = 720)
     plt.close(fig) 
     del fig
@@ -128,7 +134,7 @@ def showImgAtt(img, instance, step, ax):
 
 
 def showImgAtts(instance):
-    img = imread(inImgName(instance["imageId"]))
+    img = imread(inImgName(instance))
 
     length = len(instance["attentions"]["kb"])
     
@@ -178,7 +184,7 @@ def showTableAtt(instance, table, x, y, name):
     locs, labels = plt.yticks()
     plt.setp(labels, rotation = 0)
 
-    plt.savefig(outTableAttName(instance, name), dpi = 720)
+    savePlot(fig2, outTableAttName(instance, name))
 
 def main():
     with open(dataFile) as inFile:
@@ -199,11 +205,13 @@ def main():
         count += 1
 
         length = len(results[i]["attentions"]["kb"])
+        #import pdb
+        #pdb.set_trace()
         showImgAtts(results[i])
 
         iterations = range(1, length + 1)
-        questionList = results[i]["question"].split(" ")
-        table = np.array(results[i]["attentions"]["question"])[:,:(len(questionList) + 1)]        
+        questionList = results[i]["question"]
+        table = np.array(results[i]["attentions"]["question"])[:,:len(questionList)]        
         showTableAtt(results[i], table, iterations, questionList, "text")
 
         if args.sa:
@@ -226,7 +234,7 @@ def main():
         if args.gate:
             print(results[i]["attentions"]["gate"])
 
-        print("________________________________________________________________________")
+        print("_" * 72)
 
 if __name__ == "__main__":
     main()
