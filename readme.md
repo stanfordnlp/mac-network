@@ -61,11 +61,10 @@ Then, the program trains the model. Weights are saved by default to `./weights/{
 - Good lengths for CLEVR are in the range of 4-16 (using more cells tends to converge faster and achieves a bit higher accuracy, while lower number of cells usually results in more easily interpretable attention maps). 
 
 ### Model variants
-We have explored several variants of our model. We provide a few examples in `configs/args1-4.txt`. For instance, you can run the first by: 
+We have explored several variants of our model. We provide a few examples in `configs/args2-4.txt`. For instance, you can run the first by: 
 ```bash
-python main.py --expName "experiment1" --train --testedNum 10000 --epochs 25 --netLength 6 @configs/args1.txt
+python main.py --expName "experiment1" --train --testedNum 10000 --epochs 25 --netLength 6 @configs/args2.txt
 ```
-- [`args1`](config/args1.txt) is the standard recurrent-control-memory cell. Leads to the most interpretable results among the configs.
 - [`args2`](config/args2.txt) uses a non-recurrent variant of the control unit that converges faster.
 - [`args3`](config/args3.txt) incorporates self-attention into the write unit.
 - [`args4`](config/args4.txt) adds control-based gating over the memory.
