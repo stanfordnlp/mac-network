@@ -63,7 +63,7 @@ Then, the program trains the model. Weights are saved by default to `./weights/{
 ### Model variants
 We have explored several variants of our model. We provide a few examples in `configs/args2-4.txt`. For instance, you can run the first by: 
 ```bash
-python main.py --expName "experiment1" --train --testedNum 10000 --epochs 25 --netLength 6 @configs/args2.txt
+python main.py --expName "experiment1" --train --testedNum 10000 --epochs 40 --netLength 6 @configs/args2.txt
 ```
 - [`args2`](config/args2.txt) uses a non-recurrent variant of the control unit that converges faster.
 - [`args3`](config/args3.txt) incorporates self-attention into the write unit.
