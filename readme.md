@@ -47,7 +47,7 @@ python extract_features.py --input_image_dir CLEVR_v1/images/test --output_h5_fi
 ## Training 
 To train the model, run the following command:
 ```bash
-python main.py --expName "clevrExperiment" --train --testedNum 10000 --epochs 25 --netLength 16 @configs/args.txt
+python main.py --expName "clevrExperiment" --train --testedNum 10000 --epochs 25 --netLength 4 @configs/args.txt
 ```
 
 First, the program preprocesses the CLEVR questions. It tokenizes them and maps them to integers to prepare them for the network. It then stores a JSON with that information about them as well as word-to-integer dictionaries in the `./CLEVR_v1/data` directory.
