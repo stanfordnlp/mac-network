@@ -84,7 +84,7 @@ python main.py --expName "gqaCNN" --train --testedNum 10000 --epochs 25 @configs
 python main.py --expName "gqaLSTM-CNN" --train --testedNum 10000 --epochs 25 @configs/gqa/gqaLSTMCNN.txt
 ```
 
-## Evalutation
+## Evaluation
 To evaluate the trained model, and get predictions and attention maps, run the following: 
 ```bash
 python main.py --expName "gqaExperiment" --finalTest --testedNum 10000 --netLength 4 -r --getPreds --getAtt @configs/gqa/gqa.txt
