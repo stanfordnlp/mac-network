@@ -32,12 +32,13 @@ To download and unpack the data, run the following commands:
 ```bash
 mkdir data
 cd data
-wget https://nlp.stanford.edu/data/gqa/data.zip
-unzip data.zip
+wget https://nlp.stanford.edu/data/gqa/data1.2.zip
+unzip data1.2.zip
 wget http://nlp.stanford.edu/data/glove.6B.zip
 unzip glove.6B.zip
 cd ../
 ```
+***Note that we download the new version of GQA 1.2! It is the same as the previous version but with a new test-dev split.*** 
 We also download GloVe word embeddings which we will use in our model. The `data` directory will hold all the data files we use during training.
 
 Note: `data.zip` matches the official dataset at [`visualreasoning.net`](https://www.visualreasoning.net/download.html), but, in order to save space, contains about each question only the information needed to train MAC (e.g. doesn't contain the functional programs).
