@@ -38,7 +38,10 @@ wget http://nlp.stanford.edu/data/glove.6B.zip
 unzip glove.6B.zip
 cd ../
 ```
-***Note that we download the new version of GQA 1.1.2! It is the same as the previous version but with a new test-dev split.*** 
+#### Notes
+1. **The data zip file here contains only the minimum information and splits needed to run the model in this repository. However, to download the full version of the dataset with more information about the questions as well as the test/challenge splits please download the questions from the [`official download page`](visualreasoning.net/download.html).**
+2. **We have updated the download to be the new version of GQA 1.1.2! It is the same as the previous version but with a new test-dev split.**
+
 We also download GloVe word embeddings which we will use in our model. The `data` directory will hold all the data files we use during training.
 
 Note: `data.zip` matches the official dataset at [`visualreasoning.net`](https://www.visualreasoning.net/download.html), but, in order to save space, contains about each question only the information needed to train MAC (e.g. doesn't contain the functional programs).
