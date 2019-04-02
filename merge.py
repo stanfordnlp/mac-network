@@ -19,13 +19,13 @@ print("Merging features file for gqa_{}. This may take a while.".format(args.nam
 
 # Format specification for features files
 spec = {
-	"spatial": {"features": (148690, 2048, 7, 7)},
-	"objects": {"features": (148690, 100, 2048),
-				"bboxes": (148690, 100, 4)}
+	"spatial": {"features": (148855, 2048, 7, 7)},
+	"objects": {"features": (148855, 100, 2048),
+				"bboxes": (148855, 100, 4)}
 }
 
 # Merge hdf5 files
-lengths = []
+lengths = [0]
 with h5py.File("data/gqa_{name}.h5".format(name = args.name)) as out:
 	datasets  = {}
 	for dname in spec[args.name]:
