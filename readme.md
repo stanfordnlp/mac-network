@@ -13,6 +13,27 @@ MAC is a fully differentiable model that learns to perform multi-step reasoning.
   <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:right" width="390px">
 </div>
 
+## Bibtex
+For the GQA dataset:
+```
+@article{hudson2018gqa,
+  title={GQA: A New Dataset for Compositional Question Answering over Real-World Images},
+  author={Hudson, Drew A and Manning, Christopher D},
+  journal={Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year={2019}
+}
+```
+
+For MAC:
+```
+@article{hudson2018compositional,
+  title={Compositional Attention Networks for Machine Reasoning},
+  author={Hudson, Drew A and Manning, Christopher D},
+  journal={International Conference on Learning Representations (ICLR)},
+  year={2018}
+}
+```
+
 ## Requirements
 **Note: In the original version of the code there was a small typo which led to models looking at the wrong images. It is fixed now, so please make sure to work with the most updated version of the repository. Thanks!**
 - Tensorflow (originally has been developed with 1.3 but should work for later versions as well).
@@ -97,25 +118,5 @@ The command will restore the model we have trained, and evaluate it on the valid
 
 - In case you are interested in getting attention maps (`--getAtt`), and to avoid having large prediction files, we advise you to limit the number of examples evaluated to 5,000-20,000.
 
-## Bibtex
-For the GQA dataset:
-```
-@article{hudson2018gqa,
-  title={GQA: A New Dataset for Compositional Question Answering over Real-World Images},
-  author={Hudson, Drew A and Manning, Christopher D},
-  journal={Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year={2019}
-}
-```
-
-For MAC:
-```
-@article{hudson2018compositional,
-  title={Compositional Attention Networks for Machine Reasoning},
-  author={Hudson, Drew A and Manning, Christopher D},
-  journal={International Conference on Learning Representations (ICLR)},
-  year={2018}
-}
-```
 
 Thank you for your interest in our model and the dataset! Please contact me at dorarad@stanford.edu for any questions, comments, or suggestions! :-)
