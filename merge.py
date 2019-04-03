@@ -31,16 +31,18 @@ with h5py.File("data/gqa_{name}.h5".format(name = args.name)) as out:
 	for dname in spec[args.name]:
 		datasets[dname] = out.create_dataset(dname, spec[args.name][dname])
 
+	low = 0
 	for i in tqdm(range(args.chunksNum)):
 		with h5py.File("data/{name}/gqa_{name}_{index}.h5".format(name = args.name, index = i)) as chunk: 
-			low = 0
+			high = low + chunk["features"].shape[0]
+			
 			for dname in spec[args.name]:
-				high = low + chunk[dname].shape[0]
 				#low = i * args.chunkSize
 				#high = (i + 1) * args.chunkSize if i < args.chunksNum -1 else spec[args.name][dname][0]
 				datasets[dname][low:high] = chunk[dname][:]
-				low = high
-				lengths.append(high)
+			
+			low = high
+			lengths.append(high)
 
 # Update info file
 with open("data/{name}/gqa_{name}_info.json".format(name = args.name)) as infoIn:
