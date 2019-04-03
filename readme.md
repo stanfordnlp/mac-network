@@ -16,6 +16,27 @@ The adaptation of MAC as well as several baselines for the GQA dataset are locat
   <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:left" width="280px">
 </div>
 
+## Bibtex
+For MAC:
+```
+@inproceedings{hudson2018compositional,
+  title={Compositional Attention Networks for Machine Reasoning},
+  author={Hudson, Drew A and Manning, Christopher D},
+  journal={International Conference on Learning Representations (ICLR)},
+  year={2018}
+}
+```
+
+For the GQA dataset:
+```
+@article{hudson2018gqa,
+  title={GQA: A New Dataset for Compositional Question Answering over Real-World Images},
+  author={Hudson, Drew A and Manning, Christopher D},
+  journal={Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year={2019}
+}
+```
+
 ## Requirements
 - Tensorflow (originally has been developed with 1.3 but should work for later versions as well).
 - We have performed experiments on Maxwell Titan X GPU. We assume 12GB of GPU memory.
@@ -92,27 +113,6 @@ To get more interpretable visualizations, it is highly recommended to reduce the
 Optionally, to make the image attention maps look a little bit nicer, you can do the following (using [imagemagick](https://www.imagemagick.org)):
 ```
 for x in preds/clevrExperiment/*Img*.png; do magick convert $x -brightness-contrast 20x35 $x; done;
-```
-
-## Bibtex
-For MAC:
-```
-@inproceedings{hudson2018compositional,
-  title={Compositional Attention Networks for Machine Reasoning},
-  author={Hudson, Drew A and Manning, Christopher D},
-  journal={International Conference on Learning Representations (ICLR)},
-  year={2018}
-}
-```
-
-For the GQA dataset:
-```
-@article{hudson2018gqa,
-  title={GQA: A New Dataset for Compositional Question Answering over Real-World Images},
-  author={Hudson, Drew A and Manning, Christopher D},
-  journal={Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year={2019}
-}
 ```
 
 Thank you for your interest in our model! Please contact me at dorarad@cs.stanford.edu for any questions, comments, or suggestions! :-)
