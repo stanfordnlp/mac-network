@@ -804,6 +804,9 @@ class Preprocesser(object):
         if tier == "val" and config.valFilenames != []:
             datasetFilename = [config.datasetFile(tier)] + [config.dataFile(vf) for vf in config.valFilenames]
             instancesFilename = config.instancesFile("finalspecialVallls")
+        elif tier == "submission":
+            datasetFilename = [config.dataFile("all_submission_data.json")]
+            instancesFilename = config.instancesFile(tier)
         else:
             datasetFilename = [config.datasetFile(tier)]
             instancesFilename = config.instancesFile(tier)
@@ -827,7 +830,10 @@ class Preprocesser(object):
             dataset["train"] = self.readTier("train" + suffix, train = True)
 
         dataset["val"] = self.readTier("val" + suffix, train = trainOnVal)
-        dataset["test"] = self.readTier("testdev" + suffix, train = False)
+        if config.submission:
+            dataset["test"] = self.readTier("submission" + suffix, train = False)
+        else:
+            dataset["test"] = self.readTier("testdev" + suffix, train = False)
         
         if hasTrain:
             dataset["evalTrain"] = {}
