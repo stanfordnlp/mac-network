@@ -169,6 +169,7 @@ def parseArgs():
     parser.add_argument("--interactive",     action = "store_true") # VQA interactive mode, over test
     parser.add_argument("--interactiveTier", default = "val", choices = ["train", "val", "test"], type = str) # VQA interactive mode, over test
 
+    parser.add_argument("--submission",     action = "store_true",      help = "evaluate submission questions")
     parser.add_argument("--getPreds",       action = "store_true",      help = "store prediction")
     parser.add_argument("--getAtt",         action = "store_true",      help = "store attention maps")
     parser.add_argument("--analysisType",   default = "", type = str,   choices = ["", "questionLength, programLength","type", "arity", "qType", "aType"], help = "show breakdown of results according to type") #
