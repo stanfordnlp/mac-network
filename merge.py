@@ -15,7 +15,7 @@ parser.add_argument('--chunksNum', type = int, default = 16, help = "number of f
 parser.add_argument('--chunkSize', type = int, default = 10000, help = "file chunk size")
 args = parser.parse_args()
 
-print("Merging features file for gqa_{}. This may take a while.".format(args.name))
+print("Merging features file for gqa_{}. This may take a while (and may be 0 for some time).".format(args.name))
 
 # Format specification for features files
 spec = {
