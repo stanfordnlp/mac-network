@@ -4,6 +4,8 @@
   <b>Drew A. Hudson & Christopher D. Manning</b></span>
 </p>
 
+***Please note: We have updated the challenge deadline -- the new deadline is May 15. Best of Luck! :)***
+
 This is an extension of the [MAC network](https://arxiv.org/pdf/1803.03067.pdf) to work on the <b>[the GQA dataset](https://www.visualreasoning.net)</b>. GQA is a new dataset for real-world visual reasoning, offrering 20M diverse multi-step questions, all come along with short programs that represent their semantics, and visual pointers from words to the corresponding image regions. Here we extend the MAC network to work over VQA and GQA, and provide multiple baselines as well. 
 
 MAC is a fully differentiable model that learns to perform multi-step reasoning. See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](https://cs.stanford.edu/people/dorarad/mac/blog.html) for more information about the model, and visit the [GQA website](https://www.visualreasoning.net) for all information about the new dataset, including examples, visualizations, paper and slides.
