@@ -4,7 +4,7 @@
   <b>Drew A. Hudson & Christopher D. Manning</b></span>
 </p>
 
-***Please note: We have updated the challenge deadline to be May 15. Best of Luck! :)***
+***Please note: We have updated the [challenge](https://visualreasoning.net/challenge.html) deadline to be May 15. Best of Luck! :)***
 
 This is an extension of the [MAC network](https://arxiv.org/pdf/1803.03067.pdf) to work on the <b>[the GQA dataset](https://www.visualreasoning.net)</b>. GQA is a new dataset for real-world visual reasoning, offrering 20M diverse multi-step questions, all come along with short programs that represent their semantics, and visual pointers from words to the corresponding image regions. Here we extend the MAC network to work over VQA and GQA, and provide multiple baselines as well. 
 
