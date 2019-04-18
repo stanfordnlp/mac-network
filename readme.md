@@ -3,6 +3,8 @@
   <b>Drew A. Hudson & Christopher D. Manning</b></span>
 </p>
 
+***Please note: We have updated the [GQA challenge](https://visualreasoning.net/challenge.html) deadline to be May 15. Best of Luck! :)***
+
 This is the implementation of [Compositional Attention Networks for Machine Reasoning](https://arxiv.org/pdf/1803.03067.pdf) (ICLR 2018) on two visual reasoning datasets: [CLEVR dataset](http://cs.stanford.edu/people/jcjohns/clevr/) and the ***New*** [***GQA dataset***](https://visualreasoning.net) ([CVPR 2019](https://visualreasoning.net/gqaPaper.pdf)). We propose a fully differentiable model that learns to perform multi-step reasoning.
 See our [website](https://cs.stanford.edu/people/dorarad/mac/) and [blogpost](https://cs.stanford.edu/people/dorarad/mac/blog.html) for more information about the model!
 
