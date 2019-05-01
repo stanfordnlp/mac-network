@@ -88,9 +88,9 @@ We have explored several variants of our model. We provide a few examples in `co
 ```bash
 python main.py --expName "experiment1" --train --testedNum 10000 --epochs 40 --netLength 6 @configs/args2.txt
 ```
-- [`args2`](config/args2.txt) uses a non-recurrent variant of the control unit that converges faster.
-- [`args3`](config/args3.txt) incorporates self-attention into the write unit.
-- [`args4`](config/args4.txt) adds control-based gating over the memory.
+- [`args2`](configs/args2.txt) uses a non-recurrent variant of the control unit that converges faster.
+- [`args3`](configs/args3.txt) incorporates self-attention into the write unit.
+- [`args4`](configs/args4.txt) adds control-based gating over the memory.
 
 See [`config.py`](config.py) for further available options (Note that some of them are still in an experimental stage).
 
