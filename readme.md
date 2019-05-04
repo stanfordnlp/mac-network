@@ -120,5 +120,11 @@ The command will restore the model we have trained, and evaluate it on the valid
 
 - In case you are interested in getting attention maps (`--getAtt`), and to avoid having large prediction files, we advise you to limit the number of examples evaluated to 5,000-20,000.
 
+## Submission 
+To be able to participate in the [GQA challenge](https://visualreasoning.net/challenge.html) and submit results, we will need to evaluate the model on all the questions needed for submission file. Run the following command:
+```bash
+python main.py --expName "gqaExperiment" --finalTest --test --testAll --getPreds --netLength 4 -r --submission --getPreds @configs/gqa/gqa.txt 
+```
+Then you'll be able to find the predictions needed to be submitted at the `preds` directory, which you can then go ahead and submit to the challenge! Best of Luck!
 
 Thank you for your interest in our model and the dataset! Please contact me at dorarad@stanford.edu for any questions, comments, or suggestions! :-)
