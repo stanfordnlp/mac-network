@@ -15,7 +15,7 @@ The adaptation of MAC as well as several baselines for the GQA dataset are locat
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/cell.png" style="float:left" width="260px">
   <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/visual.png" style="float:left" width="310px">
-  <img src="https://cs.stanford.edu/people/dorarad/visual2.png" style="float:left" width="280px">
+  <img src="https://cs.stanford.edu/people/dorarad/mac/imgs/visual.png" style="float:left" width="280px">
 </div>
 
 ## Bibtex
