@@ -50,7 +50,7 @@ Before training the model, we first have to download the CLEVR dataset and extra
 ### Dataset
 To download and unpack the data, run the following commands:
 ```bash
-wget https://s3-us-west-1.amazonaws.com/clevr/CLEVR_v1.0.zip
+wget https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip
 unzip CLEVR_v1.0.zip
 mv CLEVR_v1.0 CLEVR_v1
 mkdir CLEVR_v1/data
