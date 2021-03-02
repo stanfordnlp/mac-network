@@ -17,7 +17,7 @@ MAC is a fully differentiable model that learns to perform multi-step reasoning.
 
 ## Bibtex
 For the GQA dataset:
-```
+```bibtex
 @article{hudson2018gqa,
   title={GQA: A New Dataset for Real-World Visual Reasoning and Compositional Question Answering},
   author={Hudson, Drew A and Manning, Christopher D},
@@ -27,7 +27,7 @@ For the GQA dataset:
 ```
 
 For MAC:
-```
+```bibtex
 @article{hudson2018compositional,
   title={Compositional Attention Networks for Machine Reasoning},
   author={Hudson, Drew A and Manning, Christopher D},
