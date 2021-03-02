@@ -20,7 +20,7 @@ The adaptation of MAC as well as several baselines for the GQA dataset are locat
 
 ## Bibtex
 For MAC:
-```
+```bibtex
 @inproceedings{hudson2018compositional,
   title={Compositional Attention Networks for Machine Reasoning},
   author={Hudson, Drew A and Manning, Christopher D},
@@ -30,7 +30,7 @@ For MAC:
 ```
 
 For the GQA dataset:
-```
+```bibtex
 @article{hudson2018gqa,
   title={GQA: A New Dataset for Real-World Visual Reasoning and Compositional Question Answering},
   author={Hudson, Drew A and Manning, Christopher D},
