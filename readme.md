@@ -1,7 +1,7 @@
 # GQA: A New Dataset for Real-World Visual Reasoning
 
 <p align="center">
-  <b>Drew A. Hudson & Christopher D. Manning</b></span>
+  <b><a href="https://cs.stanford.edu/~dorarad">Drew A. Hudson</a> & <a href="https://nlp.stanford.edu/~manning/">Christopher D. Manning</a></b></span>
 </p>
 
 ***Please note: We have updated the [challenge](https://visualreasoning.net/challenge.html) deadline to be May 15. Best of Luck! :)***
