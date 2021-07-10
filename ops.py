@@ -1,6 +1,7 @@
 from __future__ import division
 import math
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 from mi_gru_cell import MiGRUCell
 from mi_lstm_cell import MiLSTMCell
@@ -16,29 +17,29 @@ Initializes a weight matrix variable given a shape and a name.
 Uses random_normal initialization if 1d, otherwise uses xavier. 
 '''
 def getWeight(shape, name = ""):
-    with tf.variable_scope("weights"):               
-        initializer = tf.contrib.layers.xavier_initializer()
+    with tf.compat.v1.variable_scope("weights"):               
+        initializer = tf.compat.v1.keras.initializers.glorot_normal()
         # if len(shape) == 1: # good?
         #     initializer = tf.random_normal_initializer()        
-        W = tf.get_variable("weight" + name, shape = shape, initializer = initializer)
+        W = tf.compat.v1.get_variable("weight" + name, shape = shape, initializer = initializer)
     return W
 
 '''
 Initializes a weight matrix variable given a shape and a name. Uses xavier
 '''
 def getKernel(shape, name = ""):
-    with tf.variable_scope("kernels"):               
-        initializer = tf.contrib.layers.xavier_initializer()
-        W = tf.get_variable("kernel" + name, shape = shape, initializer = initializer)
+    with tf.compat.v1.variable_scope("kernels"):               
+        initializer = tf.compat.v1.keras.initializers.glorot_normal()
+        W = tf.compat.v1.get_variable("kernel" + name, shape = shape, initializer = initializer)
     return W
 
 '''
 Initializes a bias variable given a shape and a name.
 '''
 def getBias(shape, name = ""):
-    with tf.variable_scope("biases"):              
+    with tf.compat.v1.variable_scope("biases"):              
         initializer = tf.zeros_initializer()
-        b = tf.get_variable("bias" + name, shape = shape, initializer = initializer)
+        b = tf.compat.v1.get_variable("bias" + name, shape = shape, initializer = initializer)
     return b
 
 ######################################### basics #########################################
@@ -86,7 +87,7 @@ def L2RegularizationOp(l2 = None):
         l2 = config.l2
     l2Loss = 0
     names = ["weight", "kernel"]
-    for var in tf.trainable_variables():
+    for var in tf.compat.v1.trainable_variables():
         if any((name in var.name.lower()) for name in names):
             l2Loss += tf.nn.l2_loss(var)
     return l2 * l2Loss
@@ -112,7 +113,7 @@ Return matching scalar for each interaction.
 '''
 sumMod = ["LIN", "SUM"]
 def inter2logits(interactions, dim, sumMod = "LIN", dropout = 1.0, name = "", reuse = None):
-    with tf.variable_scope("inter2logits" + name, reuse = reuse): 
+    with tf.compat.v1.variable_scope("inter2logits" + name, reuse = reuse): 
         if sumMod == "SUM":
             logits = tf.reduce_sum(interactions, axis = -1)
         else: # "LIN"
@@ -138,7 +139,7 @@ Return attention distribution over interactions.
 [batchSize, N]
 '''
 def inter2att(interactions, dim, dropout = 1.0, name = "", reuse = None):
-    with tf.variable_scope("inter2att" + name, reuse = reuse): 
+    with tf.compat.v1.variable_scope("inter2att" + name, reuse = reuse): 
         logits = inter2logits(interactions, dim, dropout = dropout)
         attention = tf.nn.softmax(logits)    
     return attention
@@ -160,8 +161,8 @@ Performs a variant of ReLU based on config.relu
 '''
 def relu(inp):                  
     if config.relu == "PRM":
-        with tf.variable_scope(None, default_name = "prelu"):
-            alpha = tf.get_variable("alpha", shape = inp.get_shape()[-1], 
+        with tf.compat.v1.variable_scope(None, default_name = "prelu"):
+            alpha = tf.compat.v1.get_variable("alpha", shape = inp.get_shape()[-1], 
                 initializer = tf.constant_initializer(0.25))
             pos = tf.nn.relu(inp)
             neg = - (alpha * tf.nn.relu(-inp))
@@ -188,8 +189,8 @@ activations = {
 
 # Sample from Gumbel(0, 1)
 def sampleGumbel(shape): 
-    U = tf.random_uniform(shape, minval = 0, maxval = 1)
-    return -tf.log(-tf.log(U + eps) + eps)
+    U = tf.compat.v1.random_uniform(shape, minval = 0, maxval = 1)
+    return -tf.compat.v1.log(-tf.compat.v1.log(U + eps) + eps)
 
 # Draw a sample from the Gumbel-Softmax distribution
 def gumbelSoftmaxSample(logits, temperature): 
@@ -229,7 +230,7 @@ def softmaxDiscrete(logits, temperature, train):
         return tf.nn.softmax(logits)
 
 def parametricDropout(name, train):
-    var = tf.get_variable("varDp" + name, shape = (), initializer = tf.constant_initializer(2), 
+    var = tf.compat.v1.get_variable("varDp" + name, shape = (), initializer = tf.constant_initializer(2), 
         dtype = tf.float32)
     dropout = tf.cond(train, lambda: tf.sigmoid(var), lambda: 1.0)
     return dropout
@@ -251,7 +252,7 @@ Computes seq2seq loss between logits and target sequences, with given lengths.
 '''
 def seq2SeqLoss(logits, targets, lengths):
     mask = tf.sequence_mask(lengths, maxlen = tf.shape(targets)[1])
-    loss = tf.contrib.seq2seq.sequence_loss(logits, targets, tf.to_float(mask))
+    loss = tfa.seq2seq.sequence_loss(logits, targets, tf.compat.v1.to_float(mask))
     return loss
 
 '''
@@ -262,12 +263,12 @@ Computes seq2seq loss between logits and target sequences, with given lengths.
 def seq2seqAcc(preds, targets, lengths):
     mask = tf.sequence_mask(lengths, maxlen = tf.shape(targets)[1])
     corrects = tf.logical_and(tf.equal(preds, targets), mask)
-    numCorrects = tf.reduce_sum(tf.to_int32(corrects), axis = 1)
+    numCorrects = tf.reduce_sum(tf.compat.v1.to_int32(corrects), axis = 1)
     
-    acc1 = tf.to_float(numCorrects) / (tf.to_float(lengths) + eps) # add small eps instead?
+    acc1 = tf.compat.v1.to_float(numCorrects) / (tf.compat.v1.to_float(lengths) + eps) # add small eps instead?
     acc1 = tf.reduce_mean(acc1)  
     
-    acc2 = tf.to_float(tf.equal(numCorrects, lengths))
+    acc2 = tf.compat.v1.to_float(tf.equal(numCorrects, lengths))
     acc2 = tf.reduce_mean(acc2)      
 
     return acc1, acc2
@@ -300,16 +301,16 @@ def linear(inp, inDim, outDim, dropout = 1.0,
     act = "NON", actLayer = True, actDropout = 1.0, 
     retVars = False, name = "", reuse = None):
     
-    with tf.variable_scope("linearLayer" + name, reuse = reuse):        
+    with tf.compat.v1.variable_scope("linearLayer" + name, reuse = reuse):        
         W = getWeight((inDim, outDim) if outDim > 1 else (inDim, ))
         b = getBias((outDim, ) if outDim > 1 else ()) + bias
         
         if batchNorm is not None:
-            inp = tf.contrib.layers.batch_norm(inp, decay = batchNorm["decay"], 
+            inp = tf.keras.layers.BatchNormalization(inp, decay = batchNorm["decay"],
                 center = True, scale = True, is_training = batchNorm["train"], updates_collections = None)
             # tf.layers.batch_normalization, axis -1 ?
 
-        inp = tf.nn.dropout(inp, dropout)                
+        inp = tf.compat.v1.nn.dropout(inp, dropout)
         
         if outDim > 1:
             output = multiply(inp, W)
@@ -380,7 +381,7 @@ Args:
 def cnn(inp, inDim, outDim, batchNorm = None, dropout = 1.0, addBias = True, 
     kernelSize = None, stride = 1, act = "NON", name = "", reuse = None):
     
-    with tf.variable_scope("cnnLayer" + name, reuse = reuse):
+    with tf.compat.v1.variable_scope("cnnLayer" + name, reuse = reuse):
         
         if kernelSize is None:
             kernelSize = config.stemKernelSize            
@@ -390,12 +391,12 @@ def cnn(inp, inDim, outDim, batchNorm = None, dropout = 1.0, addBias = True,
         b = getBias((outDim, ))
         
         if batchNorm is not None:
-            inp = tf.contrib.layers.batch_norm(inp, decay = batchNorm["decay"], center = batchNorm["center"], 
+            inp = tf.keras.layers.BatchNormalization(inp, decay = batchNorm["decay"], center = batchNorm["center"], 
                 scale = batchNorm["scale"], is_training = batchNorm["train"], updates_collections = None)   
 
-        inp = tf.nn.dropout(inp, dropout)                
+        inp = tf.compat.v1.nn.dropout(inp, dropout)
         
-        output = tf.nn.conv2d(inp, filter = kernel, strides = [1, stride, stride, 1], padding = "SAME")
+        output = tf.compat.v1.nn.conv2d(inp, filter = kernel, strides = [1, stride, stride, 1], padding = "SAME")
         
         if addBias:
             output += b
@@ -464,9 +465,9 @@ Based on positional encoding presented in "Attention is all you need"
 # dim % 4 = 0
 # h,w can be tensor scalars
 def locationPE(h, w, dim, outDim = -1, addBias = True):    
-    x = tf.expand_dims(tf.to_float(tf.linspace(-config.locationBias, config.locationBias, w)), axis = -1)
-    y = tf.expand_dims(tf.to_float(tf.linspace(-config.locationBias, config.locationBias, h)), axis = -1)
-    i = tf.expand_dims(tf.to_float(tf.range(dim)), axis = 0)
+    x = tf.expand_dims(tf.compat.v1.to_float(tf.linspace(-config.locationBias, config.locationBias, w)), axis = -1)
+    y = tf.expand_dims(tf.compat.v1.to_float(tf.linspace(-config.locationBias, config.locationBias, h)), axis = -1)
+    i = tf.expand_dims(tf.compat.v1.to_float(tf.range(dim)), axis = 0)
 
     peSinX = tf.sin(x / (tf.pow(10000.0, i / dim)))
     peCosX = tf.cos(x / (tf.pow(10000.0, i / dim)))
@@ -514,7 +515,7 @@ mods = ["CNCT", "ADD", "LIN", "MUL"]
 def addLocation(features, inDim, lDim, outDim = -1, h = None, w = None, 
     locType = "L", mod = "CNCT", name = "", reuse = None): # h,w not needed
     
-    with tf.variable_scope("addLocation" + name, reuse = reuse):
+    with tf.compat.v1.variable_scope("addLocation" + name, reuse = reuse):
         batchSize = tf.shape(features)[0]
         if h is None:
             h = tf.shape(features)[1]
@@ -668,15 +669,15 @@ Returns the multiplication result
 def mul(x, y, dim, dropout = 1.0, proj = None, interMod = "MUL", concat = None, mulBias = None,
     extendY = True, name = "", reuse = None):
     
-    with tf.variable_scope("mul" + name, reuse = reuse):                
+    with tf.compat.v1.variable_scope("mul" + name, reuse = reuse):                
         origVals = {"x": x, "y": y, "dim": dim}
 
-        x = tf.nn.dropout(x, dropout)
-        y = tf.nn.dropout(y, dropout)
+        x = tf.compat.v1.nn.dropout(x, dropout)
+        y = tf.compat.v1.nn.dropout(y, dropout)
         # projection
         if proj is not None:
-            x = tf.nn.dropout(x, proj.get("dropout", 1.0))
-            y = tf.nn.dropout(y, proj.get("dropout", 1.0))
+            x = tf.compat.v1.nn.dropout(x, proj.get("dropout", 1.0))
+            y = tf.compat.v1.nn.dropout(y, proj.get("dropout", 1.0))
 
             if proj["shared"]:
                 xName, xReuse = "proj", None
@@ -753,16 +754,16 @@ def createCell(hDim, reuse, cellType = None, act = None, projDim = None):
     activation = activations.get(act, None) 
 
     if cellType == "ProjLSTM":
-        cell = tf.nn.rnn_cell.LSTMCell
+        cell = tf.compat.v1.nn.rnn_cell.LSTMCell
         if projDim is None:
             projDim = config.cellDim
         cell = cell(hDim, num_proj = projDim, reuse = reuse, activation = activation)
         return cell        
 
     cells = {
-        "RNN": tf.nn.rnn_cell.BasicRNNCell,
-        "GRU": tf.nn.rnn_cell.GRUCell,
-        "LSTM": tf.nn.rnn_cell.BasicLSTMCell,
+        "RNN": tf.compat.v1.nn.rnn_cell.BasicRNNCell,
+        "GRU": tf.compat.v1.nn.rnn_cell.GRUCell,
+        "LSTM": tf.compat.v1.nn.rnn_cell.BasicLSTMCell,
         "MiGRU": MiGRUCell,
         "MiLSTM": MiLSTMCell
     }
@@ -798,27 +799,27 @@ Returns the outputs sequence and final RNN state.
 def fwRNNLayer(inSeq, seqL, hDim, cellType = None, dropout = 1.0, varDp = None, 
     name = "", reuse = None): # proj = None
     
-    with tf.variable_scope("rnnLayer" + name, reuse = reuse):
+    with tf.compat.v1.variable_scope("rnnLayer" + name, reuse = reuse):
         batchSize = tf.shape(inSeq)[0]
 
         cell = createCell(hDim, reuse, cellType) # passing reuse isn't mandatory
 
         if varDp is not None:
-            cell = tf.contrib.rnn.DropoutWrapper(cell, 
+            cell = tf.compat.v1.nn.rnn_cell.DropoutWrapper(cell,
                 state_keep_prob = varDp["stateDp"],
                 input_keep_prob = varDp["inputDp"],
                 variational_recurrent = True, input_size = varDp["inputSize"], dtype = tf.float32)
         else:           
-            inSeq = tf.nn.dropout(inSeq, dropout)
+            inSeq = tf.compat.v1.nn.dropout(inSeq, dropout)
         
         initialState = cell.zero_state(batchSize, tf.float32)
 
-        outSeq, lastState = tf.nn.dynamic_rnn(cell, inSeq, 
+        outSeq, lastState = tf.compat.v1.nn.dynamic_rnn(cell, inSeq, 
             sequence_length = seqL, 
             initial_state = initialState,
             swap_memory = True)
             
-        if isinstance(lastState, tf.nn.rnn_cell.LSTMStateTuple):
+        if isinstance(lastState, tf.compat.v1.nn.rnn_cell.LSTMStateTuple):
             lastState = lastState.h
 
         # if proj is not None:
@@ -859,38 +860,38 @@ Returns the outputs sequence and final RNN state.
 def biRNNLayer(inSeq, seqL, hDim, cellType = None, dropout = 1.0, varDp = None, 
     name = "", reuse = None): # proj = None, 
 
-    with tf.variable_scope("birnnLayer" + name, reuse = reuse):
+    with tf.compat.v1.variable_scope("birnnLayer" + name, reuse = reuse):
         batchSize = tf.shape(inSeq)[0]
 
-        with tf.variable_scope("fw"):
+        with tf.compat.v1.variable_scope("fw"):
             cellFw = createCell(hDim, reuse, cellType)
-        with tf.variable_scope("bw"):
+        with tf.compat.v1.variable_scope("bw"):
             cellBw = createCell(hDim, reuse, cellType)
         
         if varDp is not None:
-            cellFw = tf.contrib.rnn.DropoutWrapper(cellFw, 
+            cellFw = tf.compat.v1.nn.rnn_cell.DropoutWrapper(cellFw, 
                 state_keep_prob = varDp["stateDp"],
                 input_keep_prob = varDp["inputDp"],
                 variational_recurrent = True, input_size = varDp["inputSize"], dtype = tf.float32)
             
-            cellBw = tf.contrib.rnn.DropoutWrapper(cellBw, 
+            cellBw = tf.compat.v1.nn.rnn_cell.DropoutWrapper(cellBw, 
                 state_keep_prob = varDp["stateDp"],
                 input_keep_prob = varDp["inputDp"],
                 variational_recurrent = True, input_size = varDp["inputSize"], dtype = tf.float32)            
         else:
-            inSeq = tf.nn.dropout(inSeq, dropout)
+            inSeq = tf.compat.v1.nn.dropout(inSeq, dropout)
 
         initialStateFw = cellFw.zero_state(batchSize, tf.float32)
         initialStateBw = cellBw.zero_state(batchSize, tf.float32)
 
-        (outSeqFw, outSeqBw), (lastStateFw, lastStateBw) = tf.nn.bidirectional_dynamic_rnn(
+        (outSeqFw, outSeqBw), (lastStateFw, lastStateBw) = tf.compat.v1.nn.bidirectional_dynamic_rnn(
             cellFw, cellBw, inSeq, 
             sequence_length = seqL, 
             initial_state_fw = initialStateFw, 
             initial_state_bw = initialStateBw,
             swap_memory = True)
 
-        if isinstance(lastStateFw, tf.nn.rnn_cell.LSTMStateTuple):
+        if isinstance(lastStateFw, tf.compat.v1.nn.rnn_cell.LSTMStateTuple):
             lastStateFw = lastStateFw.h # take c? 
             lastStateBw = lastStateBw.h  
 
@@ -940,7 +941,7 @@ Returns the outputs sequence and final RNN state.
 def RNNLayer(inSeq, seqL, hDim, bi = None, cellType = None, dropout = 1.0, varDp = None, 
     name = "", reuse = None): # proj = None
     
-    with tf.variable_scope("rnnLayer" + name, reuse = reuse):
+    with tf.compat.v1.variable_scope("rnnLayer" + name, reuse = reuse):
         if bi is None:
             bi = config.encBi
         
@@ -954,7 +955,7 @@ def RNNLayer(inSeq, seqL, hDim, bi = None, cellType = None, dropout = 1.0, varDp
 # tf counterpart?
 # hDim = config.moduleDim
 def multigridRNNLayer(featrues, h, w, dim, name = "", reuse = None):
-    with tf.variable_scope("multigridRNNLayer" + name, reuse = reuse):
+    with tf.compat.v1.variable_scope("multigridRNNLayer" + name, reuse = reuse):
         featrues = linear(featrues, dim, dim / 2, name = "i")
 
         output0 = gridRNNLayer(featrues, h, w, dim, right = True, down = True, name = "rd")
@@ -965,11 +966,11 @@ def multigridRNNLayer(featrues, h, w, dim, name = "", reuse = None):
         output = tf.concat([output0, output1, output2, output3], axis = -1)
         output = linear(output, 2 * dim, dim, name = "o")
 
-    return outputs
+    return output
 
 # h,w should be constants
 def gridRNNLayer(features, h, w, dim, right, down, name = "", reuse = None):
-    with tf.variable_scope("gridRNNLayer" + name):
+    with tf.compat.v1.variable_scope("gridRNNLayer" + name):
         batchSize = tf.shape(features)[0]
 
         cell = createCell(dim, reuse = reuse, cellType = config.stemGridRnnMod, 
@@ -1001,7 +1002,7 @@ def gridRNNLayer(features, h, w, dim, right, down, name = "", reuse = None):
 
 # tf seq2seq?
 # def projRNNLayer(inSeq, seqL, hDim, labels, labelsNum, labelsDim, labelsEmb, name = "", reuse = None):
-#     with tf.variable_scope("projRNNLayer" + name):
+#     with tf.compat.v1.variable_scope("projRNNLayer" + name):
 #         batchSize = tf.shape(features)[0]
 
 #         cell = createCell(hDim, reuse = reuse)
@@ -1034,7 +1035,7 @@ def gridRNNLayer(features, h, w, dim, right, down, name = "", reuse = None):
 #             chosenOut = tf.stack(chosenList, axis = 1)
 #             outputs = (logitsOut, chosenOut)
 #         else:
-#             labels = tf.to_float(labels)
+#             labels = tf.compat.v1.to_float(labels)
 #             labels = tf.concat([tf.zeros((batchSize, 1)), labels], axis = 1)[:, :-1] # ,newaxis
 #             inSeq = tf.concat([inSeq, tf.expand_dims(labels, axis = -1)], axis = -1)
 
@@ -1052,10 +1053,10 @@ Generates a variational dropout mask for a given shape and a dropout
 probability value.
 '''
 def generateVarDpMask(shape, keepProb):
-    randomTensor = tf.to_float(keepProb)
-    randomTensor += tf.random_uniform(shape, minval = 0, maxval = 1)
+    randomTensor = tf.compat.v1.to_float(keepProb)
+    randomTensor += tf.compat.v1.random_uniform(shape, minval = 0, maxval = 1)
     binaryTensor = tf.floor(randomTensor)
-    mask = tf.to_float(binaryTensor)
+    mask = tf.compat.v1.to_float(binaryTensor)
     return mask
 
 '''
@@ -1063,5 +1064,5 @@ Applies the a variational dropout over an input, given dropout mask
 and a dropout probability value. 
 '''
 def applyVarDpMask(inp, mask, keepProb):
-    ret = (tf.div(inp, tf.to_float(keepProb))) * mask
+    ret = (tf.compat.v1.div(inp, tf.compat.v1.to_float(keepProb))) * mask
     return ret   

@@ -56,40 +56,40 @@ class MACnet(object):
     '''
     # change to H x W x C?
     def addPlaceholders(self):
-        with tf.variable_scope("Placeholders"):
+        with tf.compat.v1.variable_scope("Placeholders"):
             ## data
             # questions            
-            self.questionsIndicesAll = tf.placeholder(tf.int32, shape = (None, None))
-            self.questionLengthsAll = tf.placeholder(tf.int32, shape = (None, ))
+            self.questionsIndicesAll = tf.compat.v1.placeholder(tf.int32, shape = (None, None))
+            self.questionLengthsAll = tf.compat.v1.placeholder(tf.int32, shape = (None, ))
 
             # images
             # put image known dimension as last dim?
-            self.imagesPlaceholder = tf.placeholder(tf.float32, shape = (None, None, None, None))
+            self.imagesPlaceholder = tf.compat.v1.placeholder(tf.float32, shape = (None, None, None, None))
             self.imagesAll = tf.transpose(self.imagesPlaceholder, (0, 2, 3, 1))
             # self.imageH = tf.shape(self.imagesAll)[1]
             # self.imageW = tf.shape(self.imagesAll)[2]
 
             # answers
-            self.answersIndicesAll = tf.placeholder(tf.int32, shape = (None, ))
+            self.answersIndicesAll = tf.compat.v1.placeholder(tf.int32, shape = (None, ))
 
             ## optimization
-            self.lr = tf.placeholder(tf.float32, shape = ())
-            self.train = tf.placeholder(tf.bool, shape = ())
+            self.lr = tf.compat.v1.placeholder(tf.float32, shape = ())
+            self.train = tf.compat.v1.placeholder(tf.bool, shape = ())
             self.batchSizeAll = tf.shape(self.questionsIndicesAll)[0]
 
             ## dropouts
             # TODO: change dropouts to be 1 - current
             self.dropouts = {
-                "encInput": tf.placeholder(tf.float32, shape = ()),
-                "encState": tf.placeholder(tf.float32, shape = ()),
-                "stem": tf.placeholder(tf.float32, shape = ()),
-                "question": tf.placeholder(tf.float32, shape = ()),
-                # self.dropouts["question"]Out = tf.placeholder(tf.float32, shape = ())
-                # self.dropouts["question"]MAC = tf.placeholder(tf.float32, shape = ())
-                "read": tf.placeholder(tf.float32, shape = ()),
-                "write": tf.placeholder(tf.float32, shape = ()),
-                "memory": tf.placeholder(tf.float32, shape = ()),
-                "output": tf.placeholder(tf.float32, shape = ())
+                "encInput": tf.compat.v1.placeholder(tf.float32, shape = ()),
+                "encState": tf.compat.v1.placeholder(tf.float32, shape = ()),
+                "stem": tf.compat.v1.placeholder(tf.float32, shape = ()),
+                "question": tf.compat.v1.placeholder(tf.float32, shape = ()),
+                # self.dropouts["question"]Out = tf.compat.v1.placeholder(tf.float32, shape = ())
+                # self.dropouts["question"]MAC = tf.compat.v1.placeholder(tf.float32, shape = ())
+                "read": tf.compat.v1.placeholder(tf.float32, shape = ()),
+                "write": tf.compat.v1.placeholder(tf.float32, shape = ()),
+                "memory": tf.compat.v1.placeholder(tf.float32, shape = ()),
+                "output": tf.compat.v1.placeholder(tf.float32, shape = ())
             }
 
             # batch norm params
@@ -103,7 +103,7 @@ class MACnet(object):
             #     self.dropouts["read"] = self.dropouts["_read"]
             
             # if config.tempDynamic:
-            #     self.tempAnnealRate = tf.placeholder(tf.float32, shape = ())
+            #     self.tempAnnealRate = tf.compat.v1.placeholder(tf.float32, shape = ())
 
             self.H, self.W, self.imageInDim = config.imageDims
 
@@ -137,7 +137,7 @@ class MACnet(object):
 
     # Splits data to a specific GPU (tower) for parallelization
     def initTowerBatch(self, towerI, towersNum, dataSize):
-        towerBatchSize = tf.floordiv(dataSize, towersNum)
+        towerBatchSize = tf.compat.v1.floordiv(dataSize, towersNum)
         start = towerI * towerBatchSize
         end = (towerI + 1) * towerBatchSize if towerI < towersNum - 1 else dataSize
 
@@ -164,7 +164,7 @@ class MACnet(object):
     '''
     def stem(self, images, inDim, outDim, addLoc = None):
 
-        with tf.variable_scope("stem"):        
+        with tf.compat.v1.variable_scope("stem"):
             if addLoc is None:
                 addLoc = config.locationAware
 
@@ -206,13 +206,13 @@ class MACnet(object):
     # Embed question using parametrized word embeddings.
     # The embedding are initialized to the values supported to the class initialization
     def qEmbeddingsOp(self, qIndices, embInit):
-        with tf.variable_scope("qEmbeddings"):
+        with tf.compat.v1.variable_scope("qEmbeddings"):
             # if config.useCPU:
             #     with tf.device('/cpu:0'):
             #         embeddingsVar = tf.Variable(self.embeddingsInit, name = "embeddings", dtype = tf.float32)
             # else:
             #     embeddingsVar = tf.Variable(self.embeddingsInit, name = "embeddings", dtype = tf.float32)
-            embeddingsVar = tf.get_variable("emb", initializer = tf.to_float(embInit), 
+            embeddingsVar = tf.compat.v1.get_variable("emb", initializer = tf.compat.v1.to_float(embInit),
                 dtype = tf.float32, trainable = (not config.wrdEmbFixed))
             embeddings = tf.concat([tf.zeros((1, config.wrdEmbDim)), embeddingsVar], axis = 0)
             questions = tf.nn.embedding_lookup(embeddings, qIndices)
@@ -221,10 +221,10 @@ class MACnet(object):
 
     # Embed answer words
     def aEmbeddingsOp(self, embInit):
-        with tf.variable_scope("aEmbeddings"):
+        with tf.compat.v1.variable_scope("aEmbeddings"):
             if embInit is None:
                 return None
-            answerEmbeddings = tf.get_variable("emb", initializer = tf.to_float(embInit), 
+            answerEmbeddings = tf.compat.v1.get_variable("emb", initializer = tf.compat.v1.to_float(embInit),
                 dtype = tf.float32)
         return answerEmbeddings
 
@@ -279,7 +279,7 @@ class MACnet(object):
     def encoder(self, questions, questionLengths, projWords = False, 
         projQuestion = False, projDim = None):
         
-        with tf.variable_scope("encoder"):
+        with tf.compat.v1.variable_scope("encoder"):
             # variational dropout option
             varDp = None
             if config.encVariationalDropout:
@@ -294,7 +294,7 @@ class MACnet(object):
                     dropout = self.dropouts["encInput"], varDp = varDp, name = "rnn%d" % i)
 
             # dropout for the question vector
-            vecQuestions = tf.nn.dropout(vecQuestions, self.dropouts["question"])
+            vecQuestions = tf.compat.v1.nn.dropout(vecQuestions, self.dropouts["question"])
             
             # projection of encoder outputs 
             if projWords:
@@ -325,7 +325,7 @@ class MACnet(object):
     Returns the new memory value.
     '''
     def baselineAttLayer(self, images, memory, inDim, hDim, name = "", reuse = None):
-        with tf.variable_scope("attLayer" + name, reuse = reuse):         
+        with tf.compat.v1.variable_scope("attLayer" + name, reuse = reuse):
             # projImages = ops.linear(images, inDim, hDim, name = "projImage")
             # projMemory = tf.expand_dims(ops.linear(memory, inDim, hDim, name = "projMemory"), axis = -2)       
             # if config.saMultiplicative:
@@ -368,7 +368,7 @@ class MACnet(object):
     [batchSize, outDim] (out dimension depends on baseline method)
     '''
     def baseline(self, vecQuestions, questionDim, images, imageDim, hDim):
-        with tf.variable_scope("baseline"):
+        with tf.compat.v1.variable_scope("baseline"):
             if config.baselineAtt:  
                 memory = self.linear(vecQuestions, questionDim, hDim, name = "qProj")
                 images = self.linear(images, imageDim, hDim, name = "iProj")
@@ -428,7 +428,7 @@ class MACnet(object):
     def MACnetwork(self, images, vecQuestions, questionWords, questionCntxWords, 
         questionLengths, name = "", reuse = None):
 
-        with tf.variable_scope("MACnetwork" + name, reuse = reuse):
+        with tf.compat.v1.variable_scope("MACnetwork" + name, reuse = reuse):
             
             self.macCell = MACCell(
                 vecQuestions = vecQuestions,
@@ -453,7 +453,7 @@ class MACnet(object):
             for i in range(config.netLength):
                 self.macCell.iteration = i
                 # if config.unsharedCells:
-                    # with tf.variable_scope("iteration%d" % i):
+                    # with tf.compat.v1.variable_scope("iteration%d" % i):
                     # macCell.myNameScope = "iteration%d" % i
                 _, state = self.macCell(none, state)                     
                 # else:
@@ -510,7 +510,7 @@ class MACnet(object):
     Returns the resulted features and their dimension. 
     '''  
     def outputOp(self, memory, vecQuestions, images, imageInDim):
-        with tf.variable_scope("outputUnit"):            
+        with tf.compat.v1.variable_scope("outputUnit"):
             features = memory
             dim = config.memDim
 
@@ -545,7 +545,7 @@ class MACnet(object):
     [batchSize, answerWordsNum]
     '''
     def classifier(self, features, inDim, aEmbeddings = None):
-        with tf.variable_scope("classifier"):                    
+        with tf.compat.v1.variable_scope("classifier"):
             outDim = config.answerWordsNum
             dims = [inDim] + config.outClassifierDims + [outDim]
             if config.answerMod != "NON":
@@ -557,10 +557,10 @@ class MACnet(object):
                 dropout = self.dropouts["output"]) 
             
             if config.answerMod != "NON":
-                logits = tf.nn.dropout(logits, self.dropouts["output"])
+                logits = tf.compat.v1.nn.dropout(logits, self.dropouts["output"])
                 interactions = ops.mul(aEmbeddings, logits, dims[-1], interMod = config.answerMod)
                 logits = ops.inter2logits(interactions, dims[-1], sumMod = "SUM")
-                logits += ops.getBias((outputDim, ), "ans")
+                logits += ops.getBias((outDim, ), "ans")
 
                 # answersWeights = tf.transpose(aEmbeddings)
 
@@ -576,9 +576,9 @@ class MACnet(object):
         return logits
 
     # def getTemp():
-    #     with tf.variable_scope("temperature"):
+    #     with tf.compat.v1.variable_scope("temperature"):
     #         if config.tempParametric:
-    #             self.temperatureVar = tf.get_variable("temperature", shape = (), 
+    #             self.temperatureVar = tf.compat.v1.get_variable("temperature", shape = (),
     #                 initializer = tf.constant_initializer(5), dtype = tf.float32)
     #             temperature = tf.sigmoid(self.temperatureVar)
     #         else:
@@ -591,7 +591,7 @@ class MACnet(object):
 
     # Computes mean cross entropy loss between logits and answers.
     def addAnswerLossOp(self, logits, answers):
-        with tf.variable_scope("answerLoss"):
+        with tf.compat.v1.variable_scope("answerLoss"):
             losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels = answers, logits = logits)
             loss = tf.reduce_mean(losses)
             self.answerLossList.append(loss)
@@ -601,11 +601,11 @@ class MACnet(object):
     # Computes predictions (by finding maximal logit value, corresponding to highest probability)
     # and mean accuracy between predictions and answers. 
     def addPredOp(self, logits, answers):
-        with tf.variable_scope("pred"):
-            preds = tf.to_int32(tf.argmax(logits, axis = -1)) # tf.nn.softmax( 
+        with tf.compat.v1.variable_scope("pred"):
+            preds = tf.compat.v1.to_int32(tf.argmax(logits, axis = -1)) # tf.nn.softmax(
             corrects = tf.equal(preds, answers) 
-            correctNum = tf.reduce_sum(tf.to_int32(corrects))
-            acc = tf.reduce_mean(tf.to_float(corrects))
+            correctNum = tf.reduce_sum(tf.compat.v1.to_int32(corrects))
+            acc = tf.reduce_mean(tf.compat.v1.to_float(corrects))
             self.correctNumList.append(correctNum) 
             self.answerAccList.append(acc)
 
@@ -613,9 +613,9 @@ class MACnet(object):
 
     # Creates optimizer (adam)
     def addOptimizerOp(self): 
-        with tf.variable_scope("trainAddOptimizer"):            
+        with tf.compat.v1.variable_scope("trainAddOptimizer"):
             self.globalStep = tf.Variable(0, dtype = tf.int32, trainable = False, name = "globalStep") # init to 0 every run?
-            optimizer = tf.train.AdamOptimizer(learning_rate = self.lr)
+            optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate = self.lr)
 
         return optimizer
 
@@ -624,10 +624,10 @@ class MACnet(object):
     using optimizer.
     '''
     def computeGradients(self, optimizer, loss, trainableVars = None): # tf.trainable_variables()
-        with tf.variable_scope("computeGradients"):            
+        with tf.compat.v1.variable_scope("computeGradients"):
             if config.trainSubset:
                 trainableVars = []
-                allVars = tf.trainable_variables()
+                allVars = tf.compat.v1.trainable_variables()
                 for var in allVars:
                     if any((s in var.name) for s in config.varSubset):
                         trainableVars.append(var)
@@ -640,9 +640,9 @@ class MACnet(object):
     for parameters.
     '''
     def addTrainingOp(self, optimizer, gradients_vars):
-        with tf.variable_scope("train"):
+        with tf.compat.v1.variable_scope("train"):
             gradients, variables = zip(*gradients_vars)
-            norm = tf.global_norm(gradients)
+            norm = tf.compat.v1.global_norm(gradients)
 
             # gradient clipping
             if config.clipGradients:            
@@ -650,14 +650,14 @@ class MACnet(object):
                 gradients_vars = zip(clippedGradients, variables)
 
             # updates ops (for batch norm) and train op
-            updateOps = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            updateOps = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(updateOps):
                 train = optimizer.apply_gradients(gradients_vars, global_step = self.globalStep)
 
             # exponential moving average
             if config.useEMA:
                 ema = tf.train.ExponentialMovingAverage(decay = config.emaDecayRate)
-                maintainAveragesOp = ema.apply(tf.trainable_variables())
+                maintainAveragesOp = ema.apply(tf.compat.v1.trainable_variables())
 
                 with tf.control_dependencies([train]):
                     trainAndUpdateOp = tf.group(maintainAveragesOp)
@@ -771,7 +771,7 @@ class MACnet(object):
         self.answerAccList = []
         self.predsList = []
 
-        with tf.variable_scope("macModel"):
+        with tf.compat.v1.variable_scope("macModel"):
             for i in range(config.gpusNum):
                 with tf.device("/gpu:{}".format(i)):
                     with tf.name_scope("tower{}".format(i)) as scope:
@@ -821,7 +821,7 @@ class MACnet(object):
                         self.gradientVarsList.append(gradient_vars)
 
                         # reuse variables in next towers
-                        tf.get_variable_scope().reuse_variables()
+                        tf.compat.v1.get_variable_scope().reuse_variables()
 
         self.averageAcrossTowers(config.gpusNum)
 

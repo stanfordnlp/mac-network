@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-class MiLSTMCell(tf.nn.rnn_cell.RNNCell):
+class MiLSTMCell(tf.compat.v1.nn.rnn_cell.RNNCell):
     def __init__(self, num_units, forget_bias = 1.0, input_size = None,
                state_is_tuple = True, activation = tf.tanh, reuse = None):
         self.numUnits = num_units
@@ -11,25 +11,25 @@ class MiLSTMCell(tf.nn.rnn_cell.RNNCell):
 
     @property
     def state_size(self):
-        return tf.nn.rnn_cell.LSTMStateTuple(self.numUnits, self.numUnits)          
+        return tf.compat.v1.nn.rnn_cell.LSTMStateTuple(self.numUnits, self.numUnits)          
 
     @property
     def output_size(self):
         return self.numUnits
 
     def mulWeights(self, inp, inDim, outDim, name = ""):
-        with tf.variable_scope("weights" + name):
-            W = tf.get_variable("weights", shape = (inDim, outDim),
-                initializer = tf.contrib.layers.xavier_initializer())
+        with tf.compat.v1.variable_scope("weights" + name):
+            W = tf.compat.v1.get_variable("weights", shape = (inDim, outDim),
+                initializer = tf.compat.v1.keras.initializers.glorot_normal())
         output = tf.matmul(inp, W)        
         return output
 
     def addBiases(self, inp1, inp2, dim, name = ""):
-        with tf.variable_scope("additiveBiases" + name):
-            b = tf.get_variable("biases", shape = (dim,), 
+        with tf.compat.v1.variable_scope("additiveBiases" + name):
+            b = tf.compat.v1.get_variable("biases", shape = (dim,), 
                 initializer = tf.zeros_initializer())
-        with tf.variable_scope("multiplicativeBias" + name):
-            beta = tf.get_variable("biases", shape = (3 * dim,), 
+        with tf.compat.v1.variable_scope("multiplicativeBias" + name):
+            beta = tf.compat.v1.get_variable("biases", shape = (3 * dim,), 
                 initializer = tf.ones_initializer())
 
         Wx, Uh, inter = tf.split(beta * tf.concat([inp1, inp2, inp1 * inp2], axis = 1), 
@@ -39,7 +39,7 @@ class MiLSTMCell(tf.nn.rnn_cell.RNNCell):
 
     def __call__(self, inputs, state, scope = None):
         scope = scope or type(self).__name__
-        with tf.variable_scope(scope, reuse = self.reuse):
+        with tf.compat.v1.variable_scope(scope, reuse = self.reuse):
             c, h = state        
             inputSize = int(inputs.shape[1])
 
@@ -68,10 +68,10 @@ class MiLSTMCell(tf.nn.rnn_cell.RNNCell):
                     self.activation(j))
             newH = self.activation(newC) * tf.nn.sigmoid(o)
 
-            newState = tf.nn.rnn_cell.LSTMStateTuple(newC, newH)
+            newState = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(newC, newH)
         return newH, newState
 
     def zero_state(self, batchSize, dtype = tf.float32):
-        return tf.nn.rnn_cell.LSTMStateTuple(tf.zeros((batchSize, self.numUnits), dtype = dtype),
+        return tf.compat.v1.nn.rnn_cell.LSTMStateTuple(tf.zeros((batchSize, self.numUnits), dtype = dtype),
                                         tf.zeros((batchSize, self.numUnits), dtype = dtype))
         
