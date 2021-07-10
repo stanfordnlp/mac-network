@@ -27,7 +27,7 @@ memory values, by computing 2-stages attention over the knowledge base.
 3. The Write Unit integrates the retrieved information to the previous hidden memory state,
 given the value of the control state, to perform the current reasoning operation.
 '''
-class MACCell(tf.nn.rnn_cell.RNNCell):
+class MACCell(tf.compat.v1.nn.rnn_cell.RNNCell):
 
     '''Initialize the MAC cell. 
     (Note that in the current version the cell is stateful -- 
@@ -133,7 +133,7 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
     def control(self, controlInput, inWords, outWords, questionLengths,
         control, contControl = None, name = "", reuse = None):
 
-        with tf.variable_scope("control" + name, reuse = reuse):
+        with tf.compat.v1.variable_scope("control" + name, reuse = reuse):
             dim = config.ctrlDim
 
             ## Step 1: compute "continuous" control state given previous control and question.
@@ -207,14 +207,14 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
     [batchSize, memDim]
     '''
     def read(self, knowledgeBase, memory, control, name = "", reuse = None):
-        with tf.variable_scope("read" + name, reuse = reuse):
+        with tf.compat.v1.variable_scope("read" + name, reuse = reuse):
             dim = config.memDim 
 
             ## memory dropout
             if config.memoryVariationalDropout:
                 memory = ops.applyVarDpMask(memory, self.memDpMask, self.dropouts["memory"])
             else:
-                memory = tf.nn.dropout(memory, self.dropouts["memory"])
+                memory = tf.compat.v1.nn.dropout(memory, self.dropouts["memory"])
 
             ## Step 1: knowledge base / memory interactions 
             # parameters for knowledge base and memory projection 
@@ -303,7 +303,7 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
     [batchSize, memDim]
     '''
     def write(self, memory, info, control, contControl = None, name = "", reuse = None):
-        with tf.variable_scope("write" + name, reuse = reuse):
+        with tf.compat.v1.variable_scope("write" + name, reuse = reuse):
 
             # optionally project info
             if config.writeInfoProj:
@@ -374,8 +374,8 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
 
         return newMemory
 
-    def memAutoEnc(newMemory, info, control, name = "", reuse = None):
-        with tf.variable_scope("memAutoEnc" + name, reuse = reuse):
+    def memAutoEnc(self, newMemory, info, control, name = "", reuse = None):
+        with tf.compat.v1.variable_scope("memAutoEnc" + name, reuse = reuse):
             # inputs to auto encoder
             features = info if config.autoEncMemInputs == "INFO" else newMemory
             features = ops.linear(features, config.memDim, config.ctrlDim, 
@@ -419,7 +419,7 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
     '''
     def __call__(self, inputs, state, scope = None):
         scope = scope or type(self).__name__
-        with tf.variable_scope(scope, reuse = self.reuse): #  as tfscope
+        with tf.compat.v1.variable_scope(scope, reuse = self.reuse): #  as tfscope
             control = state.control
             memory = state.memory
 
@@ -460,7 +460,7 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
 
             if config.writeDropout < 1.0:
                 # write unit
-                info = tf.nn.dropout(info, self.dropouts["write"])
+                info = tf.compat.v1.nn.dropout(info, self.dropouts["write"])
             
             newMemory = self.write(memory, info, newControl, self.contControl, name = cellName, reuse = cellReuse)
 
@@ -495,9 +495,9 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
     '''
     def initState(self, name, dim, initType, batchSize):
         if initType == "PRM":
-            prm = tf.get_variable(name, shape = (dim, ),
+            prm = tf.compat.v1.get_variable(name, shape = (dim, ),
                     initializer = tf.random_normal_initializer())                
-            initState = tf.tile(tf.expand_dims(prm, axis = 0), [batchSize, 1])
+            initState = tf.compat.v1.tile(tf.expand_dims(prm, axis = 0), [batchSize, 1])
         elif initType == "ZERO":
             initState = tf.zeros((batchSize, dim), dtype = tf.float32)
         else: # "Q"
@@ -516,8 +516,8 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
 
     Returns the updated word sequence and lengths.  
     '''
-    def addNullWord(words, lengths):
-        nullWord = tf.get_variable("zeroWord", shape = (1 , config.ctrlDim), initializer = tf.random_normal_initializer())                    
+    def addNullWord(self, words, lengths):
+        nullWord = tf.compat.v1.get_variable("zeroWord", shape = (1 , config.ctrlDim), initializer = tf.random_normal_initializer())
         nullWord = tf.tile(tf.expand_dims(nullWord, axis = 0), [self.batchSize, 1, 1])
         words = tf.concat([nullWord, words], axis = 1)
         lengths += 1
@@ -582,7 +582,7 @@ class MACCell(tf.nn.rnn_cell.RNNCell):
 
         # if config.controlCoverage:
         #     self.coverage = tf.zeros((batchSize, tf.shape(words)[1]), dtype = tf.float32)
-        #     self.coverageBias = tf.get_variable("coverageBias", shape = (),
+        #     self.coverageBias = tf.compat.v1.get_variable("coverageBias", shape = (),
         #         initializer = config.controlCoverageBias)  
 
         ## initialize memory variational dropout mask

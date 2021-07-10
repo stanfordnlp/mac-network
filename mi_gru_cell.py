@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-class MiGRUCell(tf.nn.rnn_cell.RNNCell):
+class MiGRUCell(tf.compat.v1.nn.rnn_cell.RNNCell):
     def __init__(self, num_units, input_size = None, activation = tf.tanh, reuse = None):
         self.numUnits = num_units
         self.activation = activation
@@ -16,19 +16,19 @@ class MiGRUCell(tf.nn.rnn_cell.RNNCell):
         return self.numUnits
 
     def mulWeights(self, inp, inDim, outDim, name = ""): 
-        with tf.variable_scope("weights" + name):
-            W = tf.get_variable("weights", shape = (inDim, outDim),
-                initializer = tf.contrib.layers.xavier_initializer())
+        with tf.compat.v1.variable_scope("weights" + name):
+            W = tf.compat.v1.get_variable("weights", shape = (inDim, outDim),
+                initializer = tf.compat.v1.keras.initializers.glorot_normal())
 
         output = tf.matmul(inp, W)        
         return output
 
     def addBiases(self, inp1, inp2, dim, bInitial = 0, name = ""):
-        with tf.variable_scope("additiveBiases" + name):
-            b = tf.get_variable("biases", shape = (dim,), 
+        with tf.compat.v1.variable_scope("additiveBiases" + name):
+            b = tf.compat.v1.get_variable("biases", shape = (dim,), 
                 initializer = tf.zeros_initializer()) + bInitial
-        with tf.variable_scope("multiplicativeBias" + name):
-            beta = tf.get_variable("biases", shape = (3 * dim,), 
+        with tf.compat.v1.variable_scope("multiplicativeBias" + name):
+            beta = tf.compat.v1.get_variable("biases", shape = (3 * dim,), 
                 initializer = tf.ones_initializer())
 
         Wx, Uh, inter = tf.split(beta * tf.concat([inp1, inp2, inp1 * inp2], axis = 1), 
@@ -38,7 +38,7 @@ class MiGRUCell(tf.nn.rnn_cell.RNNCell):
 
     def __call__(self, inputs, state, scope = None):
         scope = scope or type(self).__name__
-        with tf.variable_scope(scope, reuse = self.reuse):
+        with tf.compat.v1.variable_scope(scope, reuse = self.reuse):
             inputSize = int(inputs.shape[1])
             
             Wxr = self.mulWeights(inputs, inputSize, self.numUnits, name = "Wxr")

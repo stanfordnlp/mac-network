@@ -23,6 +23,8 @@ from preprocess import Preprocesser, bold, bcolored, writeline, writelist
 from model import MACnet
 from collections import defaultdict
 
+tf.compat.v1.disable_eager_execution()
+
 ############################################# loggers #############################################
 
 # Writes log header to file 
@@ -151,7 +153,7 @@ def writePreds(preprocessor, evalRes, extraEvalRes):
 ############################################# session #############################################
 # Initializes TF session. Sets GPU memory configuration.
 def setSession():
-    sessionConfig = tf.ConfigProto(allow_soft_placement = True, log_device_placement = False)
+    sessionConfig = tf.compat.v1.ConfigProto(allow_soft_placement = True, log_device_placement = False)
     if config.allowGrowth:
         sessionConfig.gpu_options.allow_growth = True
     if config.maxMemory < 1.0:
@@ -161,17 +163,17 @@ def setSession():
 ############################################## savers #############################################
 # Initializes savers (standard, optional exponential-moving-average and optional for subset of variables)
 def setSavers(model):
-    saver = tf.train.Saver(max_to_keep = config.weightsToKeep)
+    saver = tf.compat.v1.train.Saver(max_to_keep = config.weightsToKeep)
 
     subsetSaver = None
     if config.saveSubset:
         isRelevant = lambda var: any(s in var.name for s in config.varSubset)
-        relevantVars = [var for var in tf.global_variables() if isRelevant(var)]
-        subsetSaver = tf.train.Saver(relevantVars, max_to_keep = config.weightsToKeep, allow_empty = True)
+        relevantVars = [var for var in tf.compat.v1.global_variables() if isRelevant(var)]
+        subsetSaver = tf.compat.v1.train.Saver(relevantVars, max_to_keep = config.weightsToKeep, allow_empty = True)
     
     emaSaver = None
     if config.useEMA: 
-        emaSaver = tf.train.Saver(model.emaDict, max_to_keep = config.weightsToKeep)
+        emaSaver = tf.compat.v1.train.Saver(model.emaDict, max_to_keep = config.weightsToKeep)
 
     return {
         "saver": saver,
@@ -657,7 +659,7 @@ def main():
         config.gpusNum = len(config.gpus.split(","))
         os.environ["CUDA_VISIBLE_DEVICES"] = config.gpus
 
-    tf.logging.set_verbosity(tf.logging.ERROR)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
     # process data
     print(bold("Preprocess data..."))
@@ -673,7 +675,7 @@ def main():
     print("took {} seconds".format(bcolored("{:.2f}".format(time.time() - start), "blue")))
 
     # initializer
-    init = tf.global_variables_initializer()
+    init = tf.compat.v1.global_variables_initializer()
 
     # savers
     savers = setSavers(model)
@@ -682,7 +684,7 @@ def main():
     # sessionConfig
     sessionConfig = setSession()
     
-    with tf.Session(config = sessionConfig) as sess:
+    with tf.compat.v1.Session(config = sessionConfig) as sess:
 
         # ensure no more ops are added after model is built
         sess.graph.finalize()
@@ -711,7 +713,7 @@ def main():
                 # save weights
                 saver.save(sess, config.weightsFile(epoch))
                 if config.saveSubset:
-                    subsetSaver.save(sess, config.subsetWeightsFile(epoch))                   
+                    config.saveSubset.save(sess, config.subsetWeightsFile(epoch))
                 
                 # load EMA weights 
                 if config.useEMA:
